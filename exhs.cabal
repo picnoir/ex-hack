@@ -1,0 +1,63 @@
+-- This file has been generated from package.yaml by hpack version 0.20.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: e4b631a26b4bfbc48c0678702f3f9564ae0a34d348ca3e4806689dfd0838c3f1
+
+name:           exhs
+version:        0.1.0.0
+description:    TOFILL
+homepage:       https://github.com/TORELEASE
+bug-reports:    https://github.com/TORELEASE
+author:         Félix Baylac-Jacqué
+maintainer:     felix@alternativebit.fr
+copyright:      2018 Félix Baylac-Jacqué
+license:        GPLv3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+
+extra-source-files:
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/TOFILL
+
+library
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5,
+      foundation,
+      yaml
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_exhs
+  default-language: Haskell2010
+
+executable exhs
+  main-is: Main.hs
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , exhs
+  other-modules:
+      Paths_exhs
+  default-language: Haskell2010
+
+test-suite exhs-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , exhs
+  other-modules:
+      Paths_exhs
+  default-language: Haskell2010
