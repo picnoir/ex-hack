@@ -1,6 +1,6 @@
 module Main where
 
-import StackageTypes
+import Stackage.StackageTypes
 
 main :: IO ()
 main = undefined

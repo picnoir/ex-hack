@@ -1,0 +1,45 @@
+packages:
+  drawille:
+    users: []
+    constraints:
+      benches: expect-success
+      library-profiling: true
+      flags: {}
+      build-benchmarks: true
+      non-parallel-build: false
+      skip-build: false
+      tests: do-not-build
+      haddocks: expect-success
+      hide: false
+      maintainer: Pedro Tacla Yamada <tacla.yamada@gmail.com> @yamadapc
+      configure-args: []
+      version-range: ! '>=0.1.2.0 && <0.2'
+    version: '0.1.2.0'
+    cabal-file-info:
+      size: 2409
+      hashes:
+        MD5: 1518765abeeb698adbc558de46d45222
+        Skein512_512: a99229bbb75b0395649e6e0a571c1fa69617803486377f100b6724ad65693c80be6b81d27b47c4ca64065ba6adfd24b4738f04bd77ffc9e20584efb7863fa2bf
+        SHA1: d44b178055fb373978f9052d513e429b929a6dd7
+        SHA512: 345426ecaf3fb3db4093cd17a3bf87f44424cd16422d946db8896ec09681fe95ad8dee061744f05002bae09182c133e00d91702f4bcc8da462b672d79f8ded72
+        SHA256: 41a1627890649690d76261040c67779fa2e6fa2eb0ff912ee24891ea21b7b2f7
+        GitSHA1: dfe6d875faa4af01d4cba1e215e0da5e0885db7c
+    github-pings:
+    - yamadapc
+    description:
+      cabal-version: '1.10'
+      modules:
+      - System.Drawille
+      provided-exes:
+      - image2term
+      - senoid
+      packages:
+        base:
+          components:
+          - library
+          range: ==4.*
+        containers:
+          components:
+          - library
+          range: ==0.5.*
+      tools: {}

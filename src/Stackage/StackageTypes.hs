@@ -1,20 +1,19 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module StackageTypes (
+module Stackage.StackageTypes (
   PackagePlan(..),
-  Packages
+  Packages(..)
 ) where
 
 import Data.Aeson
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Maybe
 import Data.Text (Text)
 import Distribution.Types.PackageName (PackageName)
 import qualified Distribution.Types.PackageName as C
 
-newtype Packages = Packages (Map.Map PackageName PackagePlan)
+newtype Packages = Packages (Map.Map PackageName PackagePlan) deriving (Show, Eq)
 
 data PackagePlan = PackagePlan
     { ppVersion     :: Text
