@@ -28,11 +28,14 @@ library
   hs-source-dirs:
       src
   build-depends:
+      aeson,
       base >=4.7 && <5,
-      foundation,
+      Cabal,
+      containers,
+      text,
       yaml
   exposed-modules:
-      Lib
+      StackageTypes
   other-modules:
       Paths_exhs
   default-language: Haskell2010
