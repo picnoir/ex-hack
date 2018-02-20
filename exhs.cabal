@@ -50,6 +50,7 @@ executable exhs
   build-depends:
       base >=4.7 && <5
     , exhs
+    , http-client-tls
   other-modules:
       Paths_exhs
   default-language: Haskell2010
