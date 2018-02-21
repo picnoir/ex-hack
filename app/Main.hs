@@ -15,27 +15,15 @@ import Network.HTTP.Client.TLS
 import ExHack.Stackage.StackageTypes
 import ExHack.Stackage.StackageParser
 
-downloadCabalFile :: Manager -> (Text,Text) -> IO ()
-downloadCabalFile m (name, url) = do
-  f <- httpLbs (parseRequest_ $ T.unpack url) m 
-  writeFile ("cabal/" ++ T.unpack name ++ ".cabal") $ getResponse f 
-  return ()
-  where
-    getResponse f = E.decodeUtf8 . toStrict $ responseBody f
-
 main :: IO ()
 main = do
   -- Retrieving cabal URLs
-  logProgress "" "================================="
-  logProgress "" "STEP 1: Parsing stackage LTS-10.5"
-  logProgress "" "================================="
+  logTitle "STEP 1: Parsing stackage LTS-10.5"
   stackageYaml <- readFile "./data/lts-10.5.yaml"  
   let packages = fromJust (getHackageCabalUrl <$> parseStackageYaml stackageYaml)
 
   -- Downloading cabal files
-  logProgress "" "================================"
-  logProgress "" "STEP 2: Downloading cabal files."
-  logProgress "" "================================"
+  logTitle "STEP 2: Downloading cabal files."
   let settings = managerSetProxy
         (proxyEnvironment Nothing)
         tlsManagerSettings
@@ -53,3 +41,15 @@ sequenceLog man totalSteps pack step = do
 
 logProgress :: String -> String -> IO ()
 logProgress prefix log = putStrLn (prefix ++ log)
+
+logTitle :: String -> IO ()
+logTitle txt = line >> putStrLn txt >> line
+  where line = putStrLn (replicate (length txt) '=')
+
+downloadCabalFile :: Manager -> (Text,Text) -> IO ()
+downloadCabalFile m (name, url) = do
+  f <- httpLbs (parseRequest_ $ T.unpack url) m 
+  writeFile ("cabal/" ++ T.unpack name ++ ".cabal") $ getResponse f 
+  return ()
+  where
+    getResponse f = E.decodeUtf8 . toStrict $ responseBody f
