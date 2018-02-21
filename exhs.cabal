@@ -51,6 +51,8 @@ executable exhs
       base >=4.7 && <5
     , exhs
     , http-client-tls
+    , text
+    , mtl
   other-modules:
       Paths_exhs
   default-language: Haskell2010

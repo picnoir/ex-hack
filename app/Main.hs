@@ -1,24 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import Prelude hiding (readFile)
 import Control.Monad.State
+import Data.Text (Text)
+import Data.Text.IO (readFile)
 import qualified Data.Text as T
 
 import Stackage.StackageTypes
+import Stackage.StackageParser
 
-class Loggable a where
-    log :: a -> Text
-
-class ComputationStep where
-    compute :: IO ()
-
-data Computations = Computations {
-    steps :: [ComputationStep],
-    progress :: Int,
-    current :: ComputationStep
+data Computations =  Computations {
+    steps :: [IO()]
 }
-
-instance Loggable Computations where
-    log (Computations cSteps p c) = T.concat ["[Step ", p, "/", length cSteps, "]", log c]
 
 data CabalFiles = CabalFiles {
     urls :: [Text]
@@ -27,7 +21,7 @@ data CabalFiles = CabalFiles {
 
 main :: IO ()
 main = do
-  stackageYaml <- undefined
+  stackageYaml <- readFile "./data/lts-10.5.yaml"  
   let packages = getHackageCabalUrl <$> parseStackageYaml stackageYaml
-  putStrLn packages
+  print packages
   
