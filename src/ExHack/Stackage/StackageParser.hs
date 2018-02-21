@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Stackage.StackageParser (
+module ExHack.Stackage.StackageParser (
   parseStackageYaml,
   getHackageCabalUrl
 ) where
@@ -11,7 +11,7 @@ import Data.Text.Encoding as E
 import Data.Yaml (decode)
 import qualified Distribution.Types.PackageName as C
 
-import Stackage.StackageTypes (Packages(..), PackagePlan(..))
+import ExHack.Stackage.StackageTypes (Packages(..), PackagePlan(..))
 
 parseStackageYaml :: Text -> Maybe Packages
 parseStackageYaml = decode . E.encodeUtf8

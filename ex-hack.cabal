@@ -4,7 +4,7 @@
 --
 -- hash: e4b631a26b4bfbc48c0678702f3f9564ae0a34d348ca3e4806689dfd0838c3f1
 
-name:           exhs
+name:           ex-hack
 version:        0.1.0.0
 description:    TOFILL
 homepage:       https://github.com/TORELEASE
@@ -35,14 +35,12 @@ library
       text,
       yaml
   exposed-modules:
-      Stackage.StackageTypes,
-      Stackage.StackageParser
-  other-modules:
-      Paths_exhs
+      ExHack.Stackage.StackageTypes,
+      ExHack.Stackage.StackageParser
   default-language: Haskell2010
   ghc-options: -Wall -Werror -O2 
 
-executable exhs
+executable ex-hack
   main-is: Main.hs
   hs-source-dirs:
       app
@@ -50,13 +48,12 @@ executable exhs
   build-depends:
       base >=4.7 && <5
     , bytestring
-    , exhs
+    , ex-hack
     , http-client
     , http-client-tls
     , text
     , mtl
   other-modules:
-      Paths_exhs
   default-language: Haskell2010
 
 test-suite exhs-test
@@ -67,12 +64,11 @@ test-suite exhs-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , exhs
+    , ex-hack
     , hspec
     , file-embed
     , containers
     , text
   other-modules:
-      Paths_exhs
       Exhack.StackageSpec
   default-language: Haskell2010

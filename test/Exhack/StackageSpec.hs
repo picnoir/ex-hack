@@ -8,8 +8,8 @@ import qualified Data.Set as Set
 import Data.Text.Encoding (decodeUtf8)
 import Test.Hspec (describe, it, Spec(..), shouldBe)
 
-import Stackage.StackageParser (parseStackageYaml)
-import Stackage.StackageTypes  (Packages(..), PackagePlan(..))
+import ExHack.Stackage.StackageParser (parseStackageYaml)
+import ExHack.Stackage.StackageTypes  (Packages(..), PackagePlan(..))
 
 spec :: Spec
 spec = describe "parseStackageYaml" $ 

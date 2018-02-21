@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stackage.StackageTypes (
+module ExHack.Stackage.StackageTypes (
   PackagePlan(..),
   Packages(..)
 ) where

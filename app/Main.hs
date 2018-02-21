@@ -12,8 +12,8 @@ import qualified Data.Text.Encoding as E
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 
-import Stackage.StackageTypes
-import Stackage.StackageParser
+import ExHack.Stackage.StackageTypes
+import ExHack.Stackage.StackageParser
 
 downloadCabalFile :: Manager -> (Text,Text) -> IO ()
 downloadCabalFile m (name, url) = do
