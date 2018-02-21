@@ -49,7 +49,9 @@ executable exhs
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , bytestring
     , exhs
+    , http-client
     , http-client-tls
     , text
     , mtl

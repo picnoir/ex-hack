@@ -16,14 +16,14 @@ import Stackage.StackageTypes (Packages(..), PackagePlan(..))
 parseStackageYaml :: Text -> Maybe Packages
 parseStackageYaml = decode . E.encodeUtf8
 
-getHackageCabalUrl :: Packages -> [Text]
+getHackageCabalUrl :: Packages -> [(Text,Text)]
 getHackageCabalUrl (Packages m) = foldlWithKey getCabal [] m
-  where getCabal xs k e = T.concat ["https://hackage.haskell.org/package/", 
+  where getCabal xs k e = (packName,T.concat ["https://hackage.haskell.org/package/", 
                                     packName,
                                     "-",
                                     ppVersion e,
                                     "/",
                                     packName,
-                                    ".cabal"] : xs
+                                    ".cabal"]) : xs
           where
             !packName = T.pack $ C.unPackageName k
