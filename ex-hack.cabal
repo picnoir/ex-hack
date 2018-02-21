@@ -37,6 +37,8 @@ library
   exposed-modules:
       ExHack.Stackage.StackageTypes,
       ExHack.Stackage.StackageParser
+      ExHack.Cabal.CabalParser
+      ExHack.Types
   default-language: Haskell2010
   ghc-options: -Wall -Werror -O2 
 
@@ -70,5 +72,6 @@ test-suite exhs-test
     , containers
     , text
   other-modules:
-      Exhack.StackageSpec
+      ExHack.StackageSpec,
+      ExHack.CabalSpec
   default-language: Haskell2010

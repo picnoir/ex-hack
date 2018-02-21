@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Exhack.StackageSpec (spec) where
+module ExHack.StackageSpec (spec) where
 
 import Data.FileEmbed
 import qualified Data.Map as Map

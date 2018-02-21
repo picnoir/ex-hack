@@ -38,7 +38,6 @@ sequenceLog man totalSteps pack step = do
   logProgress "----" ("["++ show step ++ "/" ++ show totalSteps ++ "] " ++ T.unpack (fst pack))
   return $ step + 1
 
-
 logProgress :: String -> String -> IO ()
 logProgress prefix log = putStrLn (prefix ++ log)
 

@@ -1,0 +1,196 @@
+name:          ad
+version:       4.3.5
+x-revision: 2
+license:       BSD3
+license-File:  LICENSE
+copyright:     (c) Edward Kmett 2010-2015,
+               (c) Barak Pearlmutter and Jeffrey Mark Siskind 2008-2009
+author:        Edward Kmett
+maintainer:    ekmett@gmail.com
+stability:     Experimental
+category:      Math
+homepage:      http://github.com/ekmett/ad
+bug-reports:   http://github.com/ekmett/ad/issues
+build-type:    Custom
+cabal-version: >= 1.10
+tested-with:   GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.1
+synopsis:      Automatic Differentiation
+extra-source-files:
+  .ghci
+  .gitignore
+  .travis.yml
+  .vim.custom
+  CHANGELOG.markdown
+  README.markdown
+  Warning.hs
+  travis/cabal-apt-install
+  travis/config
+  include/instances.h
+description:
+    Forward-, reverse- and mixed- mode automatic differentiation combinators with a common API.
+    .
+    Type-level \"branding\" is used to both prevent the end user from confusing infinitesimals
+    and to limit unsafe access to the implementation details of each Mode.
+    .
+    Each mode has a separate module full of combinators.
+    .
+    * @Numeric.AD.Mode.Forward@ provides basic forward-mode AD. It is good for computing simple derivatives.
+    .
+    * @Numeric.AD.Mode.Reverse@ uses benign side-effects to compute reverse-mode AD. It is good for computing gradients in one pass. It generates a Wengert list (linear tape) using @Data.Reflection@.
+    .
+    * @Numeric.AD.Mode.Kahn@ uses benign side-effects to compute reverse-mode AD. It is good for computing gradients in one pass. It generates a tree-like tape that needs to be topologically sorted in the end.
+    .
+    * @Numeric.AD.Mode.Sparse@ computes a sparse forward-mode AD tower. It is good for higher derivatives or large numbers of outputs.
+    .
+    * @Numeric.AD.Mode.Tower@ computes a dense forward-mode AD tower useful for higher derivatives of single input functions.
+    .
+    * @Numeric.AD@ computes using whichever mode or combination thereof is suitable to each individual combinator.
+    .
+    While not every mode can provide all operations, the following basic operations are supported, modified as
+    appropriate by the suffixes below:
+    .
+    * 'grad' computes the gradient (partial derivatives) of a function at a point.
+    .
+    * 'jacobian' computes the Jacobian matrix of a function at a point.
+    .
+    * 'diff' computes the derivative of a function at a point.
+    .
+    * 'du' computes a directional derivative of a function at a point.
+    .
+    * 'hessian' computes the Hessian matrix (matrix of second partial derivatives) of a function at a point.
+    .
+    The following suffixes alter the meanings of the functions above as follows:
+    .
+    * @\'@ -- also return the answer
+    .
+    * @With@ lets the user supply a function to blend the input with the output
+    .
+    * @F@ is a version of the base function lifted to return a 'Traversable' (or 'Functor') result
+    .
+    * @s@ means the function returns all higher derivatives in a list or f-branching 'Stream'
+    .
+    * @T@ means the result is transposed with respect to the traditional formulation.
+    .
+    * @0@ means that the resulting derivative list is padded with 0s at the end.
+    .
+    * @NoEq@ means that an infinite list of converging values is returned rather than truncating the list when they become constant
+
+source-repository head
+  type: git
+  location: git://github.com/ekmett/ad.git
+
+flag herbie
+  default: False
+  manual: True
+
+custom-setup
+  setup-depends:
+    base          >= 4.3 && <5,
+    Cabal         >= 1.10,
+    cabal-doctest >= 1 && <1.1
+
+library
+  hs-source-dirs: src
+  include-dirs: include
+  default-language: Haskell2010
+
+  other-extensions:
+    BangPatterns
+    DeriveDataTypeable
+    FlexibleContexts
+    FlexibleInstances
+    FunctionalDependencies
+    GeneralizedNewtypeDeriving
+    MultiParamTypeClasses
+    PatternGuards
+    Rank2Types
+    ScopedTypeVariables
+    TemplateHaskell
+    TypeFamilies
+    TypeOperators
+    UndecidableInstances
+
+  build-depends:
+    array            >= 0.2   && < 0.6,
+    base             >= 4.3   && < 5,
+    comonad          >= 4     && < 6,
+    containers       >= 0.2   && < 0.6,
+    data-reify       >= 0.6   && < 0.7,
+    erf              >= 2.0   && < 2.1,
+    free             >= 4.6.1 && < 6,
+    nats             >= 0.1.2 && < 2,
+    reflection       >= 1.4   && < 3,
+    semigroups       >= 0.16  && < 1,
+    transformers     >= 0.3   && < 0.6
+
+  if impl(ghc < 7.8)
+    build-depends: tagged >= 0.7 && < 1
+
+  if flag(herbie)
+    build-depends: HerbiePlugin >= 0.1 && < 0.2
+    cpp-options: -DHERBIE
+    ghc-options: -fplugin=Herbie
+
+  exposed-modules:
+    Numeric.AD
+    Numeric.AD.Halley
+    Numeric.AD.Internal.Dense
+    Numeric.AD.Internal.Forward
+    Numeric.AD.Internal.Forward.Double
+    Numeric.AD.Internal.Identity
+    Numeric.AD.Internal.Kahn
+    Numeric.AD.Internal.On
+    Numeric.AD.Internal.Or
+    Numeric.AD.Internal.Reverse
+    Numeric.AD.Internal.Sparse
+    Numeric.AD.Internal.Tower
+    Numeric.AD.Internal.Type
+    Numeric.AD.Jacobian
+    Numeric.AD.Jet
+    Numeric.AD.Mode
+    Numeric.AD.Mode.Forward
+    Numeric.AD.Mode.Forward.Double
+    Numeric.AD.Mode.Kahn
+    Numeric.AD.Mode.Reverse
+    Numeric.AD.Mode.Sparse
+    Numeric.AD.Mode.Tower
+    Numeric.AD.Newton
+    Numeric.AD.Newton.Double
+    Numeric.AD.Rank1.Forward
+    Numeric.AD.Rank1.Forward.Double
+    Numeric.AD.Rank1.Halley
+    Numeric.AD.Rank1.Kahn
+    Numeric.AD.Rank1.Newton
+    Numeric.AD.Rank1.Newton.Double
+    Numeric.AD.Rank1.Sparse
+    Numeric.AD.Rank1.Tower
+
+  other-modules:
+    Numeric.AD.Internal.Combinators
+
+  ghc-options: -Wall
+
+  ghc-options: -fspec-constr -fdicts-cheap -O2
+
+-- Verify the results of the examples
+test-suite doctests
+  default-language: Haskell2010
+  type:    exitcode-stdio-1.0
+  main-is: doctests.hs
+  build-depends:
+    ad,
+    base,
+    directory,
+    doctest >= 0.9.0.1 && < 0.15,
+    filepath
+  ghc-options: -Wall -threaded
+  hs-source-dirs: tests
+
+benchmark blackscholes
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: BlackScholes.hs
+  hs-source-dirs: bench
+  build-depends: base, ad, erf, criterion
+  ghc-options: -fspec-constr -fdicts-cheap -O2
+
