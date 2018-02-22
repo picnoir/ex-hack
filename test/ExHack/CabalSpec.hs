@@ -5,6 +5,7 @@ module ExHack.CabalSpec (spec) where
 
 import Data.FileEmbed
 import Data.Text.Encoding (decodeUtf8)
+import Data.Set (fromList)
 import Test.Hspec
 
 import ExHack.Cabal.CabalParser
@@ -16,4 +17,4 @@ spec = describe "parseCabalFile" $
             let res = parseCabalFile (decodeUtf8 $(embedFile "test/fixtures/cabal-fixture.cabal"))
             case res of
                 (ParseFailed err) -> fail $ show err
-                (ParseOk _ res) -> res `shouldBe` Package (PackageIdentifier "ad" $ mkVersion [4, 3, 5]) ["array", "base", "comonad", "containers", "data-reify", "erf", "free", "nats", "reflection", "semigroups", "transformers"]
+                (ParseOk _ res) -> res `shouldBe` Package (PackageIdentifier "ad" $ mkVersion [4, 3, 5]) (fromList ["array", "base", "comonad", "containers", "data-reify", "erf", "free", "nats", "reflection", "semigroups", "transformers", "directory", "doctest", "filepath", "criterion"])
