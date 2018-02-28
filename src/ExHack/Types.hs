@@ -15,5 +15,3 @@ data Package = Package {
   name :: PackageIdentifier,
   deps :: Set PackageName
 } deriving (Eq, Show)
-
-

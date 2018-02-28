@@ -33,12 +33,14 @@ library
       Cabal,
       containers,
       text,
-      yaml
+      yaml,
+      HDBC
   exposed-modules:
       ExHack.Stackage.StackageTypes,
-      ExHack.Stackage.StackageParser
-      ExHack.Cabal.CabalParser
-      ExHack.Types
+      ExHack.Stackage.StackageParser,
+      ExHack.Cabal.CabalParser,
+      ExHack.Types,
+      ExHack.Data.Db
   default-language: Haskell2010
   ghc-options: -Wall -Werror -O2 
 
@@ -55,6 +57,8 @@ executable ex-hack
     , http-client-tls
     , text
     , mtl
+    , HDBC-sqlite3
+    , HDBC
   other-modules:
   default-language: Haskell2010
 

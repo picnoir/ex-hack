@@ -7,6 +7,8 @@ import Data.ByteString.Lazy (toStrict)
 import Data.Maybe (fromJust)
 import Data.Text (Text)
 import Data.Text.IO (readFile, writeFile)
+import Database.HDBC.Types (commit, disconnect)
+import Database.HDBC.Sqlite3 (connectSqlite3)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 import Network.HTTP.Client
@@ -14,9 +16,15 @@ import Network.HTTP.Client.TLS
 
 import ExHack.Stackage.StackageTypes
 import ExHack.Stackage.StackageParser
+import ExHack.Data.Db (initDb)
 
 main :: IO ()
 main = do
+  logTitle "Step 0: Init DB"
+  c <- connectSqlite3 "test.db"
+  initDb c
+  commit c
+  disconnect c
   -- Retrieving cabal URLs
   logTitle "STEP 1: Parsing stackage LTS-10.5"
   stackageYaml <- readFile "./data/lts-10.5.yaml"  
