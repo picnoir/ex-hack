@@ -52,6 +52,7 @@ executable ex-hack
   build-depends:
       base >=4.7 && <5
     , bytestring
+    , directory
     , ex-hack
     , http-client
     , http-client-tls
@@ -60,6 +61,8 @@ executable ex-hack
     , HDBC-sqlite3
     , HDBC
   other-modules:
+    Cli,
+    Log
   default-language: Haskell2010
 
 test-suite exhs-test

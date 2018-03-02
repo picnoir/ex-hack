@@ -13,45 +13,69 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
+import System.Directory (getDirectoryContents, doesFileExist, removeFile)
 
 import ExHack.Stackage.StackageTypes
 import ExHack.Stackage.StackageParser
 import ExHack.Data.Db (initDb)
 
+import Log (logProgress, logTitle)
+import Cli (step, promptUser)
+
 main :: IO ()
 main = do
-  logTitle "Step 0: Init DB"
+  step "Step 0: Init DB" isDb step0
+  -- Retrieving cabal URLs
+  logTitle "STEP 1: Parsing stackage LTS-10.5"
+  stackageYaml <- readFile "./data/lts-10.5.yaml"  
+  let packages = fromJust (getHackageCabalUrl <$> parseStackageYaml stackageYaml)
+  -- Downloading cabal files
+  step "STEP 2: Downloading cabal files." shouldDlCabalFiles (step2 packages)
+
+step0 :: IO ()
+step0 = do
   c <- connectSqlite3 "test.db"
   initDb c
   commit c
   disconnect c
-  -- Retrieving cabal URLs
-  logTitle "STEP 1: Parsing stackage LTS-10.5"
-  stackageYaml <- readFile "./data/lts-10.5.yaml"  
-  let packages = fromJust (getHackageCabalUrl <$> parseStackageYaml stackageYaml)
 
-  -- Downloading cabal files
-  logTitle "STEP 2: Downloading cabal files."
+isDb :: IO Bool
+isDb = do
+  f <- doesFileExist "test.db"
+  if f
+    then do
+      del <- promptUser "A database is already here, delete it?"
+      if del
+        then putStrLn "Deleting..." >> removeFile "test.db" >> return True
+        else return False
+    else return True
+
+step2 :: [(Text, Text)] -> IO ()
+step2 packages = do
   let settings = managerSetProxy
         (proxyEnvironment Nothing)
         tlsManagerSettings
   m <- newManager settings
-  foldr (sequenceLog m (length packages)) (return 1) packages
+  foldr (dlFoldCabalFiles m (length packages)) (return 1) packages
   return ()
 
-sequenceLog :: Manager -> Int -> (Text,Text) -> IO Int -> IO Int
-sequenceLog man totalSteps pack step = do 
+shouldDlCabalFiles :: IO Bool
+shouldDlCabalFiles = do
+  f <- getDirectoryContents "cabal/"
+  if not (null f)
+    then do
+      r <- promptUser "Looks like your cabal directory already contains cabal files, wanna skip\
+              \ this step?"
+      if r then putStrLn "Skipping..." >> return False else return True
+    else
+      return True
+
+dlFoldCabalFiles :: Manager -> Int -> (Text,Text) -> IO Int -> IO Int
+dlFoldCabalFiles man totalSteps pack step = do 
   step <- step
   downloadCabalFile man pack
   logProgress "----" ("["++ show step ++ "/" ++ show totalSteps ++ "] " ++ T.unpack (fst pack))
   return $ step + 1
-
-logProgress :: String -> String -> IO ()
-logProgress prefix log = putStrLn (prefix ++ log)
-
-logTitle :: String -> IO ()
-logTitle txt = line >> putStrLn txt >> line
-  where line = putStrLn (replicate (length txt) '=')
 
 downloadCabalFile :: Manager -> (Text,Text) -> IO ()
 downloadCabalFile m (name, url) = do
