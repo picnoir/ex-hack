@@ -1,5 +1,6 @@
 module ExHack.Cabal.CabalParser (
   parseCabalFile,
+  getSuccParse,
   ParseResult(..)
 ) where
 
@@ -12,6 +13,12 @@ import Distribution.PackageDescription.Parse
 import Distribution.Types.Dependency
 
 import ExHack.Types
+
+getSuccParse :: [ParseResult Package] -> [Package]
+getSuccParse = foldr appendParseResult [] 
+    where
+      appendParseResult (ParseFailed _) xs = xs
+      appendParseResult (ParseOk _ a) xs = a:xs
 
 parseCabalFile :: Text -> ParseResult Package
 parseCabalFile str = Package <$> packN <*> filteredPackDep 

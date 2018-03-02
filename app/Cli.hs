@@ -1,17 +1,20 @@
 module Cli (
   step,
-  promptUser
+  promptUser,
+  PreCondition
 ) where
 
 import Control.Monad (when)
 
 import Log (logTitle)
 
-step :: String -> IO Bool -> IO () -> IO ()
-step n pc a = do
+type PreCondition = IO Bool
+
+step :: String -> PreCondition -> IO () -> IO ()
+step n pc action = do
   logTitle n
-  preCond <- pc
-  when preCond a
+  preCond <- pc 
+  when preCond action
 
 promptUser :: String -> IO Bool
 promptUser str = do
