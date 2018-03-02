@@ -4,6 +4,7 @@ module ExHack.Data.Db (
   savePackageDeps
 ) where
 
+import Data.Maybe          (catMaybes)
 import Database.HDBC       (quickQuery', fromSql)
 import Database.HDBC.Types (IConnection, run, executeMany, toSql,
                             prepare, SqlValue)
@@ -14,13 +15,15 @@ savePackageDeps c p = do
   pkgId <- toSql <$> getPkgId (getName p)
   depsId <- getDepsIds p
   stm <- prepare c "INSERT INTO DEPENDENCIES (PACKID, DEPID) VALUES (?,?)"
-  executeMany stm $ buildParams pkgId depsId 
+  executeMany stm $ buildParams pkgId (catMaybes depsId)
   where
     
     buildParams :: SqlValue -> [Int] -> [[SqlValue]]
     buildParams pId dIds = (\di -> [pId, toSql di]) <$> dIds
-    getPkgId :: String -> IO Int
-    getPkgId dn = fromSql . head . head <$> quickQuery' c "SELECT ID FROM PACKAGES WHERE NAME = ?" [toSql dn] 
+    getPkgId :: String -> IO (Maybe Int)
+    getPkgId dn = packageId <$> quickQuery' c "SELECT ID FROM PACKAGES WHERE NAME = ?" [toSql dn] 
+    packageId :: [[SqlValue]] -> Maybe Int
+    packageId xs = if null xs then Nothing else fromSql . head $ head xs
     getDepsIds pkg = mapM getPkgId $ depsNames pkg 
 
 savePackages :: IConnection c => c -> [Package] -> IO ()

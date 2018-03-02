@@ -106,11 +106,13 @@ step3 = do
   c <- connectSqlite3 dbFilePath
   putStrLn "Saving packages to DB..."
   savePackages c pkgs
+  commit c
   putStrLn "Done."
+  -- 4
   putStrLn "Saving dependancies to DB..."
   foldr (foldInsertDep c (length pkgs)) (return 1) pkgs
-  putStrLn "Done."
   commit c
+  putStrLn "Done."
   disconnect c
   return ()
 
