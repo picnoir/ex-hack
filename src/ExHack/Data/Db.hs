@@ -17,7 +17,6 @@ savePackageDeps c p = do
   stm <- prepare c "INSERT INTO DEPENDENCIES (PACKID, DEPID) VALUES (?,?)"
   executeMany stm $ buildParams pkgId (catMaybes depsId)
   where
-    
     buildParams :: SqlValue -> [Int] -> [[SqlValue]]
     buildParams pId dIds = (\di -> [pId, toSql di]) <$> dIds
     getPkgId :: String -> IO (Maybe Int)
@@ -28,16 +27,21 @@ savePackageDeps c p = do
 
 savePackages :: IConnection c => c -> [Package] -> IO ()
 savePackages c p = do
-  stm <- prepare c "INSERT INTO PACKAGES (NAME) VALUES (?)"
+  stm <- prepare c "INSERT INTO PACKAGES (NAME, CABAL_FILE, TARBALL_PATH) VALUES (?, ?, ?)"
   executeMany stm sqlValues
   where
-    sqlValues = ((:[]) . toSql . getName) <$> p
+    !sqlValues = getPackageParams <$> p
+    getPackageParams pack = [toSql $ getName pack, 
+                             toSql $ cabalFile pack, 
+                             toSql $ tarballPath pack]
 
 initDb :: IConnection c => c -> IO ()
 initDb c = do
              _ <- run c "CREATE TABLE PACKAGES(\
                    \ ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
-                   \ NAME TEXT)" []
+                   \ NAME TEXT,\
+                   \ TARBALL_PATH TEXT,\
+                   \ CABAL_FILE TEXT);" []
              _ <- run c "CREATE TABLE DEPENDENCIES(\
                    \ ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
                    \ PACKID INTEGER,\

@@ -19,10 +19,8 @@ parseStackageYaml = decode . E.encodeUtf8
 getHackageUrls :: Packages -> [(Text,Text,Text)]
 getHackageUrls (Packages m) = foldlWithKey getCabal [] m
   where getCabal xs k e = (packName,
-                            mconcat [base,
-                                    packName,
-                                    ".cabal"],
-                            mconcat [base, packName, "-", ppVersion e, ".tar.gz"]) : xs
+                           mconcat [base,packName,".cabal"],
+                           mconcat [base, packName, "-", ppVersion e, ".tar.gz"]) : xs
           where
             !packName = T.pack $ C.unPackageName k
             !base = mconcat ["https://hackage.haskell.org/package/", 
