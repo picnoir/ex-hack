@@ -66,4 +66,4 @@ extra-deps: [HDBC-sqlite3-2.3.3.1]
 # compiler-check: newer-minor
 nix:
   enable: true
-  packages: [sqlite]
+  packages: [sqlite gmp]

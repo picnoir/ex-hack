@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module ExHack.Stackage.StackageParser (
   parseStackageYaml,
-  getHackageCabalUrl
+  getHackageUrls
 ) where
 
 import Data.Map   (foldlWithKey)
@@ -16,14 +16,14 @@ import ExHack.Stackage.StackageTypes (Packages(..), PackagePlan(..))
 parseStackageYaml :: Text -> Maybe Packages
 parseStackageYaml = decode . E.encodeUtf8
 
-getHackageCabalUrl :: Packages -> [(Text,Text)]
-getHackageCabalUrl (Packages m) = foldlWithKey getCabal [] m
-  where getCabal xs k e = (packName,T.concat ["https://hackage.haskell.org/package/", 
+getHackageUrls :: Packages -> [(Text,Text,Text)]
+getHackageUrls (Packages m) = foldlWithKey getCabal [] m
+  where getCabal xs k e = (packName,
+                            mconcat [base,
                                     packName,
-                                    "-",
-                                    ppVersion e,
-                                    "/",
-                                    packName,
-                                    ".cabal"]) : xs
+                                    ".cabal"],
+                            mconcat [base, packName, "-", ppVersion e, ".tar.gz"]) : xs
           where
             !packName = T.pack $ C.unPackageName k
+            !base = mconcat ["https://hackage.haskell.org/package/", 
+                                packName, "-", ppVersion e, "/"]

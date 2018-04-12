@@ -21,7 +21,7 @@ getSuccParse = foldr appendParseResult []
       appendParseResult (ParseOk _ a) xs = a:xs
 
 parseCabalFile :: Text -> ParseResult Package
-parseCabalFile str = Package <$> packN <*> filteredPackDep 
+parseCabalFile str = Package <$> packN <*> filteredPackDep <*> pure str <*> pure ""
     where
       gpackageDesc = parseGenericPackageDescription (unpack str)
       packN = package .  packageDescription <$> gpackageDesc

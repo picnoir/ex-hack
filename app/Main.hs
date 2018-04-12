@@ -24,7 +24,7 @@ import ExHack.Types (Package(..))
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
-import Config (cabalFilesDir, dbFilePath)
+import Config (cabalFilesDir, tarballsDir, dbFilePath)
 import Cli (step, promptUser, PreCondition)
 import Log (logProgress, logTitle)
 
@@ -34,7 +34,7 @@ main = do
   logTitle "STEP 1: Parsing stackage LTS-10.5"
   stackageYaml <- readFile "./data/lts-10.5.yaml"  
   let packages = fromJust $ parseStackageYaml stackageYaml
-  step "STEP 2: Downloading cabal files" shouldDlCabalFiles (step2 $ getHackageCabalUrl packages)
+  step "STEP 2: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles (step2 $ getHackageUrls packages)
   step "STEP 3: Generating dependancy graph" (return True) step3
 
 step0 :: IO ()
@@ -55,7 +55,7 @@ isDb = do
         else return False
     else return True
 
-step2 :: [(Text, Text)] -> IO ()
+step2 :: [(Text, Text, Text)] -> IO ()
 step2 packages = do
   let settings = managerSetProxy
         (proxyEnvironment Nothing)
@@ -75,17 +75,19 @@ shouldDlCabalFiles = do
     else
       return True
 
-dlFoldCabalFiles :: Manager -> Int -> (Text,Text) -> IO Int -> IO Int
-dlFoldCabalFiles man totalSteps pack step = do 
+dlFoldCabalFiles :: Manager -> Int -> (Text,Text,Text) -> IO Int -> IO Int
+dlFoldCabalFiles man totalSteps p@(pn, _, _) step = do 
   step <- step
-  downloadCabalFile man pack
-  logProgress "----" ("["++ show step ++ "/" ++ show totalSteps ++ "] " ++ T.unpack (fst pack))
+  downloadCabalFile man p
+  logProgress "----" ("["++ show step ++ "/" ++ show totalSteps ++ "] " ++ T.unpack pn)
   return $ step + 1
 
-downloadCabalFile :: Manager -> (Text,Text) -> IO ()
-downloadCabalFile m (name, url) = do
-  f <- httpLbs (parseRequest_ $ T.unpack url) m 
+downloadCabalFile :: Manager -> (Text,Text,Text) -> IO ()
+downloadCabalFile m (name, cabalUrl, tarballUrl) = do
+  f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) m 
   writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ getResponse f 
+  f <- httpLbs (parseRequest_ $ T.unpack tarballUrl) m
+  writeFile (tarballsDir ++ T.unpack name ++ ".tar.gz") $ getResponse f 
   return ()
   where
     getResponse f = E.decodeUtf8 . toStrict $ responseBody f
