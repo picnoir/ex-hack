@@ -79,12 +79,12 @@ shouldDlCabalFiles = do
 dlFoldCabalFiles :: Manager -> Int -> (Text,Text,Text) -> IO Int -> IO Int
 dlFoldCabalFiles man totalSteps p@(pn, _, _) step = do 
   step <- step
-  downloadCabalFile man p
+  downloadHackageFiles man p
   logProgress "----" ("["++ show step ++ "/" ++ show totalSteps ++ "] " ++ T.unpack pn)
   return $ step + 1
 
-downloadCabalFile :: Manager -> (Text,Text,Text) -> IO ()
-downloadCabalFile m (name, cabalUrl, tarballUrl) = do
+downloadHackageFiles :: Manager -> (Text,Text,Text) -> IO ()
+downloadHackageFiles m (name, cabalUrl, tarballUrl) = do
   f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) m 
   writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ getResponse f 
   f <- httpLbs (parseRequest_ $ T.unpack tarballUrl) m
