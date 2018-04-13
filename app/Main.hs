@@ -24,18 +24,18 @@ import ExHack.Types (Package(..))
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
-import Config (cabalFilesDir, tarballsDir, dbFilePath)
+import Config (cabalFilesDir, tarballsDir, dbFilePath, dataDir)
 import Cli (step, promptUser, PreCondition)
 import Log (logProgress, logTitle)
 
 main :: IO ()
 main = do
-  step "STEP 0: Creating DB" isDb step0
-  logTitle "STEP 1: Parsing stackage LTS-10.5"
+  step "[+] STEP 0: Creating DB" isDb step0
+  logTitle "[+] STEP 1: Parsing stackage LTS-10.5"
   stackageYaml <- readFile "./data/lts-10.5.yaml"  
   let packages = fromJust $ parseStackageYaml stackageYaml
-  step "STEP 2: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles (step2 $ getHackageUrls packages)
-  step "STEP 3: Generating dependancy graph" (return True) step3
+  step "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles (step2 $ getHackageUrls packages)
+  step "[+] STEP 3: Generating dependancy graph" (return True) step3
 
 step0 :: IO ()
 step0 = do
@@ -49,7 +49,7 @@ isDb = do
   f <- doesFileExist dbFilePath
   if f
     then do
-      del <- promptUser "A database is already here, delete it?"
+      del <- promptUser "A database has already been generated, delete it?"
       if del
         then putStrLn "Deleting..." >> removeFile dbFilePath >> return True
         else return False
@@ -66,10 +66,11 @@ step2 packages = do
 
 shouldDlCabalFiles :: PreCondition
 shouldDlCabalFiles = do
-  f <- getDirectoryContents cabalFilesDir
-  if not (null f)
+  c <- getDirectoryContents cabalFilesDir
+  t <- getDirectoryContents tarballsDir
+  if not (null $ c `mappend` t)
     then do
-      r <- promptUser "Looks like your cabal directory already contains cabal files, wanna skip\
+      r <- promptUser "Looks like your data directory is not empty, wanna skip\
               \ this step?"
       if r then putStrLn "Skipping..." >> return False else return True
     else
@@ -106,15 +107,15 @@ step3 = do
   let pkgs = getSuccParse $ parseCabalFile <$> pkgT
   -- 3
   c <- connectSqlite3 dbFilePath
-  putStrLn "Saving packages to DB..."
+  putStrLn "[+] Saving packages to DB..."
   savePackages c pkgs
   commit c
-  putStrLn "Done."
+  putStrLn "[+] Done."
   -- 4
-  putStrLn "Saving dependancies to DB..."
+  putStrLn "[+] Saving dependancies to DB..."
   foldr (foldInsertDep c (length pkgs)) (return 1) pkgs
   commit c
-  putStrLn "Done."
+  putStrLn "[+] Done."
   disconnect c
   return ()
 

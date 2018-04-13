@@ -1,14 +1,18 @@
 module Config (
   cabalFilesDir,
   tarballsDir,
-  dbFilePath
+  dbFilePath,
+  dataDir
 ) where
 
+dataDir :: String
+dataDir = "data"
+
 cabalFilesDir :: String
-cabalFilesDir = "cabal/"
+cabalFilesDir = dataDir ++ "/cabal/"
 
 tarballsDir :: String
-tarballsDir = "tarballs/"
+tarballsDir = dataDir ++ "/tarballs/"
 
 dbFilePath :: String
-dbFilePath = "test.db"
+dbFilePath = dataDir ++ "/data.db"
