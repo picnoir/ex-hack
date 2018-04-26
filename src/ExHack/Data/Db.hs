@@ -1,51 +1,59 @@
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module ExHack.Data.Db (
   initDb,
   savePackages,
   savePackageDeps
 ) where
 
-import Data.Maybe          (catMaybes)
-import Database.HDBC       (quickQuery', fromSql)
-import Database.HDBC.Types (IConnection, run, executeMany, toSql,
-                            prepare, SqlValue)
-import ExHack.Types (Package(..), getName, depsNames)
+import Data.Maybe        (listToMaybe)
+import Data.Text         (Text, pack)
+import Database.Selda    
+import ExHack.Types      (Package(..), getName)
 
-savePackageDeps :: IConnection c => c -> Package -> IO ()
-savePackageDeps c p = do
-  pkgId <- toSql <$> getPkgId (getName p)
-  depsId <- getDepsIds p
-  stm <- prepare c "INSERT INTO DEPENDENCIES (PACKID, DEPID) VALUES (?,?)"
-  executeMany stm $ buildParams pkgId (catMaybes depsId)
+packages :: Table (RowID :*: Text :*: Text :*: Text)
+(packages, packageId :*: packageName :*: _ :*: _) 
+  = tableWithSelectors "package" $
+              autoPrimary "packageId"
+              :*: required "name"
+              :*: required "tarball_path"
+              :*: required "cabal_file"
+
+initDb :: SeldaM ()
+initDb = tryCreateTable packages >> tryCreateTable dependancies 
+
+savePackageDeps :: Package -> SeldaM ()
+savePackageDeps p = do
+  packId <- query $ do
+    pack <- select packages
+    restrict (pack ! packageName .== (text . getName) p)
+    return . listToMaybe $ pack ! packageId 
+  insert_ dependancies [ x :*: x ]
+  return ()
+    
+--pkgId <- toSql <$> getPkgId (getName p)
+--depsId <- getDepsIds p
+--stm <- prepare c "INSERT INTO DEPENDENCIES (PACKID, DEPID) VALUES (?,?)"
+--executeMany stm $ buildParams pkgId (catMaybes depsId)
+--where
+--  buildParams :: SqlValue -> [Int] -> [[SqlValue]]
+--  buildParams pId dIds = (\di -> [pId, toSql di]) <$> dIds
+--  getPkgId :: String -> IO (Maybe Int)
+--  getPkgId dn = packageId <$> quickQuery' c "SELECT ID FROM PACKAGES WHERE NAME = ?" [toSql dn] 
+--  packageId :: [[SqlValue]] -> Maybe Int
+--  packageId xs = if null xs then Nothing else fromSql . head $ head xs
+--  getDepsIds pkg = mapM getPkgId $ depsNames pkg 
+
+savePackages :: [Package] -> SeldaM ()
+savePackages xs = (insert_ packages . generateCols) `mapM_` xs 
   where
-    buildParams :: SqlValue -> [Int] -> [[SqlValue]]
-    buildParams pId dIds = (\di -> [pId, toSql di]) <$> dIds
-    getPkgId :: String -> IO (Maybe Int)
-    getPkgId dn = packageId <$> quickQuery' c "SELECT ID FROM PACKAGES WHERE NAME = ?" [toSql dn] 
-    packageId :: [[SqlValue]] -> Maybe Int
-    packageId xs = if null xs then Nothing else fromSql . head $ head xs
-    getDepsIds pkg = mapM getPkgId $ depsNames pkg 
+    generateCols p = [def :*: getName p :*: cabalFile p :*: (pack . tarballPath) p]
 
-savePackages :: IConnection c => c -> [Package] -> IO ()
-savePackages c p = do
-  stm <- prepare c "INSERT INTO PACKAGES (NAME, CABAL_FILE, TARBALL_PATH) VALUES (?, ?, ?)"
-  executeMany stm sqlValues
-  where
-    !sqlValues = getPackageParams <$> p
-    getPackageParams pack = [toSql $ getName pack, 
-                             toSql $ cabalFile pack, 
-                             toSql $ tarballPath pack]
 
-initDb :: IConnection c => c -> IO ()
-initDb c = do
-             _ <- run c "CREATE TABLE PACKAGES(\
-                   \ ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
-                   \ NAME TEXT,\
-                   \ TARBALL_PATH TEXT,\
-                   \ CABAL_FILE TEXT);" []
-             _ <- run c "CREATE TABLE DEPENDENCIES(\
-                   \ ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\
-                   \ PACKID INTEGER,\
-                   \ DEPID INTEGER,\
-                   \ FOREIGN KEY (PACKID) REFERENCES PACKAGES(ID),\
-                   \ FOREIGN KEY (DEPID) REFERENCES PACKAGES(ID));" [] 
-             return ()
+dependancies :: Table (RowID :*: RowID :*: RowID)
+dependancies = table "dependancies" $
+                   autoPrimary "id"
+                   :*: required "packID" `fk` (packages, packageId)
+                   :*: required "depID" `fk` (packages, packageId)
+

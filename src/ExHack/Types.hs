@@ -9,7 +9,7 @@ module ExHack.Types (
 ) where
 
 import Data.Set (Set, toList)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Distribution.Types.PackageId
 import Distribution.Types.PackageName
 import Distribution.Version
@@ -22,8 +22,8 @@ data Package = Package {
   tarballPath :: FilePath
 } deriving (Eq, Show)
 
-getName :: Package -> String
-getName = unPackageName . pkgName . name
+getName :: Package -> Text
+getName = pack . unPackageName . pkgName . name
 
 depsNames :: Package -> [String]
 depsNames pkg = unPackageName <$> toList (deps pkg)

@@ -8,8 +8,6 @@ import Data.Maybe (fromJust)
 import Data.Text (Text)
 import Data.Text.IO (readFile, writeFile)
 import Data.List (isSuffixOf)
-import Database.HDBC.Types (commit, disconnect)
-import Database.HDBC.Sqlite3 (connectSqlite3, Connection)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 import Network.HTTP.Client

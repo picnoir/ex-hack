@@ -35,7 +35,8 @@ library
       filepath,
       text,
       yaml,
-      HDBC
+      selda,
+      selda-sqlite
   exposed-modules:
       ExHack.Stackage.StackageTypes,
       ExHack.Stackage.StackageParser,
@@ -43,7 +44,7 @@ library
       ExHack.Types,
       ExHack.Data.Db
   default-language: Haskell2010
-  ghc-options: -Wall -Werror -O2 
+  ghc-options: -Wall -O2 
 
 executable ex-hack
   main-is: Main.hs
@@ -59,8 +60,8 @@ executable ex-hack
     , http-client-tls
     , text
     , mtl
-    , HDBC-sqlite3
-    , HDBC
+    , selda
+    , selda-sqlite
   other-modules:
     Cli,
     Config,
