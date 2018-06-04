@@ -10,19 +10,20 @@ import Data.Text.IO (readFile, writeFile)
 import Data.List (isSuffixOf)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
+import Database.Selda (SeldaM)
+import Database.Selda.SQLite (withSQLite)
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import System.Directory (getDirectoryContents, doesFileExist, 
                          removeFile, listDirectory)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
-import ExHack.Stackage.StackageTypes
 import ExHack.Stackage.StackageParser
 import ExHack.Types (Package(..))
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
-import Config (cabalFilesDir, tarballsDir, dbFilePath, dataDir)
+import Config (cabalFilesDir, tarballsDir, dbFilePath)
 import Cli (step, promptUser, PreCondition)
 import Log (logProgress, logTitle)
 
@@ -36,11 +37,7 @@ main = do
   step "[+] STEP 3: Generating dependancy graph" (return True) step3
 
 step0 :: IO ()
-step0 = do
-  c <- connectSqlite3 dbFilePath
-  initDb c
-  commit c
-  disconnect c
+step0 = withSQLite dbFilePath initDb
 
 isDb :: PreCondition
 isDb = do
@@ -59,7 +56,7 @@ step2 packages = do
         (proxyEnvironment Nothing)
         tlsManagerSettings
   m <- newManager settings
-  foldr (dlFoldCabalFiles m (length packages)) (return 1) packages
+  _ <- foldr (dlFoldCabalFiles m (length packages)) (return 1) packages
   return ()
 
 shouldDlCabalFiles :: PreCondition
@@ -104,22 +101,19 @@ step3 = do
   pkgT <- mapM (readFile . (cabalFilesDir ++ )) f
   let pkgs = getSuccParse $ parseCabalFile <$> pkgT
   -- 3
-  c <- connectSqlite3 dbFilePath
-  putStrLn "[+] Saving packages to DB..."
-  savePackages c pkgs
-  commit c
-  putStrLn "[+] Done."
-  -- 4
-  putStrLn "[+] Saving dependancies to DB..."
-  foldr (foldInsertDep c (length pkgs)) (return 1) pkgs
-  commit c
-  putStrLn "[+] Done."
-  disconnect c
+  withSQLite dbFilePath $ do
+    liftIO $ putStrLn "[+] Saving packages to DB..."
+    savePackages pkgs
+    liftIO $ putStrLn "[+] Done."
+    -- 4
+    liftIO $ putStrLn "[+] Saving dependancies to DB..."
+    _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs
+    liftIO $ putStrLn "[+] Done."
   return ()
 
-foldInsertDep :: Connection -> Int -> Package -> IO Int -> IO Int
-foldInsertDep c totalDeps pkg step = do 
+foldInsertDep :: Int -> Package -> SeldaM Int -> SeldaM Int
+foldInsertDep totalDeps pkg step = do 
   step <- step
-  savePackageDeps c pkg
-  logProgress "----" ("["++ show step ++ "/" ++ show totalDeps ++ "] " ++ show pkg)
+  savePackageDeps pkg
+  liftIO $ logProgress "----" ("["++ show step ++ "/" ++ show totalDeps ++ "] " ++ show pkg)
   return $ step + 1

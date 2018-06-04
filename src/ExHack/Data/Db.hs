@@ -10,7 +10,8 @@ module ExHack.Data.Db (
 import Data.Maybe        (listToMaybe)
 import Data.Text         (Text, pack)
 import Database.Selda    
-import ExHack.Types      (Package(..), getName)
+import ExHack.Types      (Package(..), getName,
+                          depsNames)
 
 packages :: Table (RowID :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
@@ -20,31 +21,35 @@ packages :: Table (RowID :*: Text :*: Text :*: Text)
               :*: required "tarball_path"
               :*: required "cabal_file"
 
+-- | Create the internal database schema.
 initDb :: SeldaM ()
 initDb = tryCreateTable packages >> tryCreateTable dependancies 
 
+-- | Save a package dependancies.
+--
+-- Note that if we can't a dependancy in the
+-- packages table, we'll ignore it.
+--
+-- You should make sure your package database is already
+-- populated before using this.
 savePackageDeps :: Package -> SeldaM ()
 savePackageDeps p = do
-  packId <- query $ do
-    pack <- select packages
-    restrict (pack ! packageName .== (text . getName) p)
-    return . listToMaybe $ pack ! packageId 
-  insert_ dependancies [ x :*: x ]
-  return ()
-    
---pkgId <- toSql <$> getPkgId (getName p)
---depsId <- getDepsIds p
---stm <- prepare c "INSERT INTO DEPENDENCIES (PACKID, DEPID) VALUES (?,?)"
---executeMany stm $ buildParams pkgId (catMaybes depsId)
---where
---  buildParams :: SqlValue -> [Int] -> [[SqlValue]]
---  buildParams pId dIds = (\di -> [pId, toSql di]) <$> dIds
---  getPkgId :: String -> IO (Maybe Int)
---  getPkgId dn = packageId <$> quickQuery' c "SELECT ID FROM PACKAGES WHERE NAME = ?" [toSql dn] 
---  packageId :: [[SqlValue]] -> Maybe Int
---  packageId xs = if null xs then Nothing else fromSql . head $ head xs
---  getDepsIds pkg = mapM getPkgId $ depsNames pkg 
+  mpid <- query $ do
+    pks <- select packages
+    restrict (pks ! packageName .== (text . getName) p)
+    return $ pks ! packageId 
+  let resPackDeps = depsNames p 
+  mapM_ (\rowId -> saveDep rowId `mapM_` resPackDeps) (listToMaybe mpid)
+  where
+    saveDep :: RowID -> String -> SeldaM ()
+    saveDep pid d = do
+      mdid <- query $ do 
+        pks <- select packages
+        restrict (pks ! packageName .== text (pack d))
+        return $ pks ! packageId
+      mapM_ (\depId -> insert_ dependancies [ def :*: depId :*: pid ]) (listToMaybe mdid)
 
+-- | Save a package list in the DB.
 savePackages :: [Package] -> SeldaM ()
 savePackages xs = (insert_ packages . generateCols) `mapM_` xs 
   where
