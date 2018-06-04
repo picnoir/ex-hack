@@ -3,7 +3,7 @@ module Main where
 
 import Prelude hiding (readFile, writeFile)
 import Control.Monad.State
-import Data.ByteString.Lazy (toStrict)
+import qualified Data.ByteString.Lazy as BS (toStrict, writeFile)
 import Data.Maybe (fromJust)
 import Data.Text (Text)
 import Data.Text.IO (readFile, writeFile)
@@ -61,8 +61,8 @@ step2 packages = do
 
 shouldDlCabalFiles :: PreCondition
 shouldDlCabalFiles = do
-  c <- getDirectoryContents cabalFilesDir
-  t <- getDirectoryContents tarballsDir
+  c <- listDirectory cabalFilesDir
+  t <- listDirectory tarballsDir
   if not (null $ c `mappend` t)
     then do
       r <- promptUser "Looks like your data directory is not empty, wanna skip\
@@ -81,12 +81,10 @@ dlFoldCabalFiles man totalSteps p@(pn, _, _) step = do
 downloadHackageFiles :: Manager -> (Text,Text,Text) -> IO ()
 downloadHackageFiles m (name, cabalUrl, tarballUrl) = do
   f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) m 
-  writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ getResponse f 
+  BS.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
   f <- httpLbs (parseRequest_ $ T.unpack tarballUrl) m
-  writeFile (tarballsDir ++ T.unpack name ++ ".tar.gz") $ getResponse f 
+  BS.writeFile (tarballsDir ++ T.unpack name ++ ".tar.gz") $ responseBody f 
   return ()
-  where
-    getResponse f = E.decodeUtf8 . toStrict $ responseBody f
 
 step3 :: IO ()
 step3 = do
