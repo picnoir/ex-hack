@@ -12,15 +12,17 @@ import Data.Yaml (decode)
 import qualified Distribution.Types.PackageName as C
 
 import ExHack.Stackage.StackageTypes (Packages(..), PackagePlan(..))
+import ExHack.Types (PackageDlDesc(..))
 
 parseStackageYaml :: Text -> Maybe Packages
 parseStackageYaml = decode . E.encodeUtf8
 
-getHackageUrls :: Packages -> [(Text,Text,Text)]
+getHackageUrls :: Packages -> [PackageDlDesc]
 getHackageUrls (Packages m) = foldlWithKey getCabal [] m
-  where getCabal xs k e = (packName,
+  where getCabal xs k e = (PackageDlDesc(packName,
                            mconcat [base,packName,".cabal"],
-                           mconcat [base, packName, "-", ppVersion e, ".tar.gz"]) : xs
+                           mconcat [base,packName, "-",ppVersion e, ".tar.gz"],
+                           mconcat [base,packName, "-",ppVersion e, "/docs/", packName, ".txt"])) : xs
           where
             !packName = T.pack $ C.unPackageName k
             !base = mconcat ["https://hackage.haskell.org/package/", 

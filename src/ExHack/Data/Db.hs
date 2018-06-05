@@ -13,9 +13,15 @@ import Database.Selda
 import ExHack.Types      (Package(..), getName,
                           depsNames)
 
+dependancies :: Table (RowID :*: RowID :*: RowID)
+dependancies = table "dependancies" $
+                   autoPrimary "id"
+                   :*: required "packID" `fk` (packages, packageId)
+                   :*: required "depID" `fk` (packages, packageId)
+
 packages :: Table (RowID :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
-  = tableWithSelectors "package" $
+  = tableWithSelectors "packages" $
               autoPrimary "packageId"
               :*: required "name"
               :*: required "tarball_path"
@@ -55,10 +61,4 @@ savePackages xs = (insert_ packages . generateCols) `mapM_` xs
   where
     generateCols p = [def :*: getName p :*: cabalFile p :*: (pack . tarballPath) p]
 
-
-dependancies :: Table (RowID :*: RowID :*: RowID)
-dependancies = table "dependancies" $
-                   autoPrimary "id"
-                   :*: required "packID" `fk` (packages, packageId)
-                   :*: required "depID" `fk` (packages, packageId)
 

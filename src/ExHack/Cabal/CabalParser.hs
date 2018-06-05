@@ -54,4 +54,4 @@ parseCabalFile tarballsDir cstr = Package <$> packN <*> filteredPackDep <*> tPat
       treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
       prApp :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
       prApp a b = (++) <$> a <*> b
-      tPath = fmap (\n -> pack tarballsDir <> (pack . unPackageName $ pkgName n) <> "tar.gz") packN
+      tPath = fmap (\n -> pack tarballsDir <> (pack . unPackageName $ pkgName n) <> ".tar.gz") packN

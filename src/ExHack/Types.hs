@@ -2,10 +2,12 @@ module ExHack.Types (
   Package(..),
   PackageIdentifier(..),
   PackageName,
+  PackageDlDesc(..),
   mkPackageName,
   mkVersion,
   getName,
-  depsNames
+  depsNames,
+  packagedlDescName
 ) where
 
 import Data.Set (Set, toList)
@@ -21,6 +23,14 @@ data Package = Package {
   cabalFile :: Text,
   tarballPath :: FilePath
 } deriving (Eq, Show)
+
+-- | Intermediate package description
+--   used till we parse the data necessary
+--   to generate the proper package description.
+newtype PackageDlDesc = PackageDlDesc (Text,Text,Text,Text)
+
+packagedlDescName :: PackageDlDesc -> Text
+packagedlDescName (PackageDlDesc (n, _, _, _)) = n
 
 getName :: Package -> Text
 getName = pack . unPackageName . pkgName . name

@@ -17,11 +17,13 @@ import System.Directory (doesFileExist, removeFile, listDirectory)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Stackage.StackageParser
-import ExHack.Types (Package(..))
+import ExHack.Types (Package(..), PackageDlDesc(..),
+                     packagedlDescName)
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
-import Config (cabalFilesDir, tarballsDir, dbFilePath)
+import Config (cabalFilesDir, tarballsDir, dbFilePath,
+               hoogleFilesDir)
 import Cli (step, promptUser, PreCondition)
 import Log (logProgress, logTitle)
 
@@ -48,7 +50,7 @@ isDb = do
         else return False
     else return True
 
-step2 :: [(Text, Text, Text)] -> IO ()
+step2 :: [ PackageDlDesc ] -> IO ()
 step2 packages = do
   let settings = managerSetProxy
         (proxyEnvironment Nothing)
@@ -69,19 +71,22 @@ shouldDlCabalFiles = do
     else
       return True
 
-dlFoldCabalFiles :: Manager -> Int -> (Text,Text,Text) -> IO Int -> IO Int
-dlFoldCabalFiles man totalSteps p@(pn, _, _) step = do 
+dlFoldCabalFiles :: Manager -> Int -> PackageDlDesc -> IO Int -> IO Int
+dlFoldCabalFiles man totalSteps p step = do 
   step <- step
+  let pn = packagedlDescName p
   downloadHackageFiles man p
   logProgress "----" ("["++ show step ++ "/" ++ show totalSteps ++ "] " ++ T.unpack pn)
   return $ step + 1
 
-downloadHackageFiles :: Manager -> (Text,Text,Text) -> IO ()
-downloadHackageFiles m (name, cabalUrl, tarballUrl) = do
+downloadHackageFiles :: Manager -> PackageDlDesc -> IO ()
+downloadHackageFiles m (PackageDlDesc (name, cabalUrl, tarballUrl, hoogleUrl)) = do
   f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) m 
   BS.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
   f <- httpLbs (parseRequest_ $ T.unpack tarballUrl) m
   BS.writeFile (tarballsDir ++ T.unpack name ++ ".tar.gz") $ responseBody f 
+  f <- httpLbs (parseRequest_ $ T.unpack hoogleUrl) m
+  BS.writeFile (hoogleFilesDir ++ T.unpack name ++ ".txt") $ responseBody f 
   return ()
 
 step3 :: IO ()
