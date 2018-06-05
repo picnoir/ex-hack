@@ -3,19 +3,17 @@ module Main where
 
 import Prelude hiding (readFile, writeFile)
 import Control.Monad.State
-import qualified Data.ByteString.Lazy as BS (toStrict, writeFile)
+import qualified Data.ByteString.Lazy as BS (writeFile)
 import Data.Maybe (fromJust)
 import Data.Text (Text)
-import Data.Text.IO (readFile, writeFile)
+import Data.Text.IO (readFile)
 import Data.List (isSuffixOf)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as E
 import Database.Selda (SeldaM)
 import Database.Selda.SQLite (withSQLite)
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
-import System.Directory (getDirectoryContents, doesFileExist, 
-                         removeFile, listDirectory)
+import System.Directory (doesFileExist, removeFile, listDirectory)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Stackage.StackageParser
@@ -97,7 +95,7 @@ step3 = do
   f <- filter (isSuffixOf ".cabal") <$> listDirectory cabalFilesDir
   -- 2
   pkgT <- mapM (readFile . (cabalFilesDir ++ )) f
-  let pkgs = getSuccParse $ parseCabalFile <$> pkgT
+  let pkgs = getSuccParse $ (parseCabalFile tarballsDir) <$> pkgT
   -- 3
   withSQLite dbFilePath $ do
     liftIO $ putStrLn "[+] Saving packages to DB..."

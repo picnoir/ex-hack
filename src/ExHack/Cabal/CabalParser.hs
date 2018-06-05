@@ -1,13 +1,16 @@
+{-# LANGUAGE OverloadedStrings #-}
 module ExHack.Cabal.CabalParser (
   parseCabalFile,
   getSuccParse,
   ParseResult(..)
 ) where
 
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import Data.Maybe 
 import Data.Set (Set, fromList)
 import qualified Data.Set as S (filter)
+import Data.Monoid ((<>))
+import Distribution.Types.PackageName
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Types.Dependency
@@ -20,10 +23,10 @@ getSuccParse = foldr appendParseResult []
       appendParseResult (ParseFailed _) xs = xs
       appendParseResult (ParseOk _ a) xs = a:xs
 
-parseCabalFile :: Text -> ParseResult Package
-parseCabalFile str = Package <$> packN <*> filteredPackDep <*> pure str <*> pure ""
+parseCabalFile :: String -> Text -> ParseResult Package
+parseCabalFile tarballsDir cstr = Package <$> packN <*> filteredPackDep <*> tPath <*> pure (unpack cstr)
     where
-      gpackageDesc = parseGenericPackageDescription (unpack str)
+      gpackageDesc = parseGenericPackageDescription (unpack cstr)
       packN = package .  packageDescription <$> gpackageDesc
 --    We want deps for both the app and the potential libs.
 --    The following code is messy as hell but necessary. Deps are quite heavily burried
@@ -51,3 +54,4 @@ parseCabalFile str = Package <$> packN <*> filteredPackDep <*> pure str <*> pure
       treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
       prApp :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
       prApp a b = (++) <$> a <*> b
+      tPath = fmap (\n -> pack tarballsDir <> (pack . unPackageName $ pkgName n) <> "tar.gz") packN
