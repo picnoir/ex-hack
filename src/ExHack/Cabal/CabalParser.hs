@@ -1,32 +1,36 @@
-{-# LANGUAGE OverloadedStrings #-}
 module ExHack.Cabal.CabalParser (
   parseCabalFile,
   getSuccParse,
-  ParseResult(..)
+  runParseResult
 ) where
 
-import Data.Text (Text, pack, unpack)
-import Data.Maybe 
+import Data.Text (Text)
+import Data.Text.Encoding (encodeUtf8)
+import Data.Maybe (maybeToList)
 import Data.Set (Set, fromList)
 import qualified Data.Set as S (filter)
-import Data.Monoid ((<>))
-import Distribution.Types.PackageName
-import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
-import Distribution.Types.Dependency
+import Distribution.Types.CondTree (condTreeConstraints)
+import Distribution.Types.GenericPackageDescription (condExecutables, condSubLibraries,
+                                                     condTestSuites, condBenchmarks,
+                                                     condLibrary, packageDescription)
+import Distribution.Types.PackageDescription (package)
+import Distribution.PackageDescription.Parsec (ParseResult, runParseResult,
+                                               parseGenericPackageDescription)
+import Distribution.Types.Dependency (Dependency, depPkgName) 
 
 import ExHack.Types
 
 getSuccParse :: [ParseResult Package] -> [Package]
 getSuccParse = foldr appendParseResult [] 
     where
-      appendParseResult (ParseFailed _) xs = xs
-      appendParseResult (ParseOk _ a) xs = a:xs
+      appendParseResult pr xs = case runParseResult pr of
+                                    (_, Left _) -> xs
+                                    (_, Right x) -> x:xs
 
-parseCabalFile :: String -> Text -> ParseResult Package
-parseCabalFile tarballsDir cstr = Package <$> packN <*> filteredPackDep <*> tPath <*> pure (unpack cstr)
+parseCabalFile :: (String,Text,Text) -> ParseResult Package
+parseCabalFile (tp, cf, hf) = Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> pure hf 
     where
-      gpackageDesc = parseGenericPackageDescription (unpack cstr)
+      gpackageDesc = parseGenericPackageDescription $ encodeUtf8 cf
       packN = package .  packageDescription <$> gpackageDesc
 --    We want deps for both the app and the potential libs.
 --    The following code is messy as hell but necessary. Deps are quite heavily burried
@@ -54,4 +58,3 @@ parseCabalFile tarballsDir cstr = Package <$> packN <*> filteredPackDep <*> tPat
       treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
       prApp :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
       prApp a b = (++) <$> a <*> b
-      tPath = fmap (\n -> pack tarballsDir <> (pack . unPackageName $ pkgName n) <> ".tar.gz") packN

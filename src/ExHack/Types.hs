@@ -21,7 +21,8 @@ data Package = Package {
   name :: PackageIdentifier,
   deps :: Set PackageName,
   cabalFile :: Text,
-  tarballPath :: FilePath
+  tarballPath :: FilePath,
+  hoogleFile :: Text 
 } deriving (Eq, Show)
 
 -- | Intermediate package description

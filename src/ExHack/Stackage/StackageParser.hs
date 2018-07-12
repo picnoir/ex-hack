@@ -8,21 +8,23 @@ import Data.Map   (foldlWithKey)
 import Data.Text  (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding as E
-import Data.Yaml (decode)
+import Data.Yaml (decodeEither')
 import qualified Distribution.Types.PackageName as C
 
 import ExHack.Stackage.StackageTypes (Packages(..), PackagePlan(..))
 import ExHack.Types (PackageDlDesc(..))
 
 parseStackageYaml :: Text -> Maybe Packages
-parseStackageYaml = decode . E.encodeUtf8
+parseStackageYaml t = case decodeEither' $ E.encodeUtf8 t of
+                      Right p -> Just p
+                      _ -> Nothing
 
 getHackageUrls :: Packages -> [PackageDlDesc]
 getHackageUrls (Packages m) = foldlWithKey getCabal [] m
-  where getCabal xs k e = (PackageDlDesc(packName,
+  where getCabal xs k e = PackageDlDesc(packName,
                            mconcat [base,packName,".cabal"],
                            mconcat [base,packName, "-",ppVersion e, ".tar.gz"],
-                           mconcat [base,packName, "-",ppVersion e, "/docs/", packName, ".txt"])) : xs
+                           mconcat [base, "docs/", packName, ".txt"]) : xs
           where
             !packName = T.pack $ C.unPackageName k
             !base = mconcat ["https://hackage.haskell.org/package/", 

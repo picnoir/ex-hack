@@ -5,9 +5,9 @@ import Prelude hiding (readFile, writeFile)
 import Control.Monad.State
 import qualified Data.ByteString.Lazy as BS (writeFile)
 import Data.Maybe (fromJust)
+import Data.Monoid ((<>))
 import Data.Text (Text)
 import Data.Text.IO (readFile)
-import Data.List (isSuffixOf)
 import qualified Data.Text as T
 import Database.Selda (SeldaM)
 import Database.Selda.SQLite (withSQLite)
@@ -18,7 +18,7 @@ import System.Directory (doesFileExist, removeFile, listDirectory)
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Stackage.StackageParser
 import ExHack.Types (Package(..), PackageDlDesc(..),
-                     packagedlDescName)
+                     packagedlDescName, packagedlDescName)
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
@@ -29,15 +29,17 @@ import Log (logProgress, logTitle)
 
 main :: IO ()
 main = do
-  step "[+] STEP 0: Creating DB" isDb step0
+  step "[+] STEP 0: Creating DB" isDb sGenerateDb 
   logTitle "[+] STEP 1: Parsing stackage LTS-10.5"
   stackageYaml <- readFile "./data/lts-10.5.yaml"  
   let packages = fromJust $ parseStackageYaml stackageYaml
-  step "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles (step2 $ getHackageUrls packages)
-  step "[+] STEP 3: Generating dependancy graph" (return True) step3
+      hackageUrl = getHackageUrls packages
+  logTitle "[+] STEP 2: bootstrapping GHC"
+  step "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles $ sDlHack hackageUrl
+  step "[+] STEP 3: Generating dependancy graph" (return True) (sGenDepGraph hackageUrl)
 
-step0 :: IO ()
-step0 = withSQLite dbFilePath initDb
+sGenerateDb :: IO ()
+sGenerateDb = withSQLite dbFilePath initDb
 
 isDb :: PreCondition
 isDb = do
@@ -50,8 +52,8 @@ isDb = do
         else return False
     else return True
 
-step2 :: [ PackageDlDesc ] -> IO ()
-step2 packages = do
+sDlHack :: [ PackageDlDesc ] -> IO ()
+sDlHack packages = do
   let settings = managerSetProxy
         (proxyEnvironment Nothing)
         tlsManagerSettings
@@ -89,28 +91,33 @@ downloadHackageFiles m (PackageDlDesc (name, cabalUrl, tarballUrl, hoogleUrl)) =
   BS.writeFile (hoogleFilesDir ++ T.unpack name ++ ".txt") $ responseBody f 
   return ()
 
-step3 :: IO ()
-step3 = do
-  -- 1. List cabal files
-  -- 2. Parse cabal files
-  -- 3. Insert Packages
-  -- 4. Insert Deps
+sGenDepGraph :: [PackageDlDesc] -> IO ()
+sGenDepGraph pkgsDesc = do
+  -- 1. Parse cabal files
+  -- 2. Insert Packages
+  -- 3. Insert Deps
   --
   -- 1
-  f <- filter (isSuffixOf ".cabal") <$> listDirectory cabalFilesDir
+  putStrLn "[+] Parsing cabal files."
+  pkgs <- readPkgsFiles `mapM` pkgsDesc
+  let pkgs' = getSuccParse (parseCabalFile <$> pkgs)
   -- 2
-  pkgT <- mapM (readFile . (cabalFilesDir ++ )) f
-  let pkgs = getSuccParse $ (parseCabalFile tarballsDir) <$> pkgT
-  -- 3
   withSQLite dbFilePath $ do
     liftIO $ putStrLn "[+] Saving packages to DB..."
-    savePackages pkgs
+    savePackages pkgs'
     liftIO $ putStrLn "[+] Done."
-    -- 4
+    -- 3
     liftIO $ putStrLn "[+] Saving dependancies to DB..."
-    _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs
+    _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs'
     liftIO $ putStrLn "[+] Done."
   return ()
+    where
+      readPkgsFiles :: PackageDlDesc -> IO (String, Text, Text)
+      readPkgsFiles p = do
+        let tp = tarballsDir <> T.unpack (packagedlDescName p) <> ".tar.gz"
+        cf <- readFile $ cabalFilesDir <> T.unpack (packagedlDescName p) <> ".cabal"
+        hf <- readFile $ hoogleFilesDir <> T.unpack (packagedlDescName p) <> ".txt"
+        return (tp,cf,hf)
 
 foldInsertDep :: Int -> Package -> SeldaM Int -> SeldaM Int
 foldInsertDep totalDeps pkg step = do 

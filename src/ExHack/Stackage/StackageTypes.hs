@@ -6,12 +6,12 @@ module ExHack.Stackage.StackageTypes (
   Packages(..)
 ) where
 
-import Data.Aeson
+import Data.Aeson (FromJSON(..), (.:?), (.:), (.!=), withObject)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (Text)
 import Distribution.Types.PackageName (PackageName)
-import qualified Distribution.Types.PackageName as C
+import qualified Distribution.Types.PackageName as C (mkPackageName)
 
 newtype Packages = Packages (Map.Map PackageName PackagePlan) deriving (Show, Eq)
 

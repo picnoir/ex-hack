@@ -19,13 +19,14 @@ dependancies = table "dependancies" $
                    :*: required "packID" `fk` (packages, packageId)
                    :*: required "depID" `fk` (packages, packageId)
 
-packages :: Table (RowID :*: Text :*: Text :*: Text)
+packages :: Table (RowID :*: Text :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
   = tableWithSelectors "packages" $
               autoPrimary "packageId"
               :*: required "name"
               :*: required "tarball_path"
               :*: required "cabal_file"
+              :*: required "hoogle_file"
 
 -- | Create the internal database schema.
 initDb :: SeldaM ()
@@ -59,6 +60,5 @@ savePackageDeps p = do
 savePackages :: [Package] -> SeldaM ()
 savePackages xs = (insert_ packages . generateCols) `mapM_` xs 
   where
-    generateCols p = [def :*: getName p :*: cabalFile p :*: (pack . tarballPath) p]
-
+    generateCols p = [def :*: getName p :*: cabalFile p :*: (pack . tarballPath) p :*: hoogleFile p]
 
