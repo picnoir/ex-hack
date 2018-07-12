@@ -33,6 +33,7 @@ library
       Cabal,
       containers,
       filepath,
+      lens,
       process,
       text,
       yaml,
@@ -40,6 +41,8 @@ library
       selda-sqlite,
       zlib
   exposed-modules:
+      ExHack.Config,
+      ExHack.Stackage.Stack,
       ExHack.Stackage.StackageTypes,
       ExHack.Stackage.StackageParser,
       ExHack.Cabal.CabalParser,

@@ -3,6 +3,7 @@ module ExHack.Types (
   PackageIdentifier(..),
   PackageName,
   PackageDlDesc(..),
+  UnparsedPackage(..),
   mkPackageName,
   mkVersion,
   getName,
@@ -29,6 +30,8 @@ data Package = Package {
 --   used till we parse the data necessary
 --   to generate the proper package description.
 newtype PackageDlDesc = PackageDlDesc (Text,Text,Text,Text)
+
+newtype UnparsedPackage = UnparsedPackage (String, Text, Text)
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _, _)) = n

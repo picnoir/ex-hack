@@ -18,7 +18,7 @@ import System.Directory (doesFileExist, removeFile, listDirectory)
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Stackage.StackageParser
 import ExHack.Types (Package(..), PackageDlDesc(..),
-                     packagedlDescName, packagedlDescName)
+                     UnparsedPackage(..), packagedlDescName, packagedlDescName)
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
@@ -100,7 +100,7 @@ sGenDepGraph pkgsDesc = do
   -- 1
   putStrLn "[+] Parsing cabal files."
   pkgs <- readPkgsFiles `mapM` pkgsDesc
-  let pkgs' = getSuccParse (parseCabalFile <$> pkgs)
+  let pkgs' = getSuccParse (parseCabalFile . UnparsedPackage <$> pkgs)
   -- 2
   withSQLite dbFilePath $ do
     liftIO $ putStrLn "[+] Saving packages to DB..."

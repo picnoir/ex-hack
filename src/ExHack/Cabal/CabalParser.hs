@@ -4,7 +4,6 @@ module ExHack.Cabal.CabalParser (
   runParseResult
 ) where
 
-import Data.Text (Text)
 import Data.Text.Encoding (encodeUtf8)
 import Data.Maybe (maybeToList)
 import Data.Set (Set, fromList)
@@ -27,8 +26,8 @@ getSuccParse = foldr appendParseResult []
                                     (_, Left _) -> xs
                                     (_, Right x) -> x:xs
 
-parseCabalFile :: (String,Text,Text) -> ParseResult Package
-parseCabalFile (tp, cf, hf) = Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> pure hf 
+parseCabalFile :: UnparsedPackage -> ParseResult Package
+parseCabalFile (UnparsedPackage (tp, cf, hf)) = Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> pure hf 
     where
       gpackageDesc = parseGenericPackageDescription $ encodeUtf8 cf
       packN = package .  packageDescription <$> gpackageDesc
