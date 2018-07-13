@@ -19,6 +19,8 @@ dependancies = table "dependancies" $
                    :*: required "packID" `fk` (packages, packageId)
                    :*: required "depID" `fk` (packages, packageId)
 
+packageId :: Selector (RowID :*: (Text :*: (Text :*: (Text :*: Text)))) RowID
+packageName :: Selector (RowID :*: (Text :*: (Text :*: (Text :*: Text)))) Text
 packages :: Table (RowID :*: Text :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
   = tableWithSelectors "packages" $
