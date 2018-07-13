@@ -16,7 +16,7 @@ spec :: Spec
 spec = describe "parseCabalFile" $
           it "should parse a file" $ do
             let 
-              cf  = decodeUtf8 $(embedFile "test/fixtures/cabal-fixture.cabal")
+              cf  = decodeUtf8 $(embedFile "test/unit/fixtures/cabal-fixture.cabal")
               res = parseCabalFile $ UnparsedPackage ("", cf, "")
             case runParseResult res of
                 (_, Left err) -> fail $ show err

@@ -14,8 +14,8 @@ import ExHack.Stackage.StackageTypes  (Packages(..), PackagePlan(..))
 spec :: Spec
 spec = describe "parseStackageYaml" $ 
           it "should parse a text" $
-            parseStackageYaml (decodeUtf8 $(embedFile "test/fixtures/stack-fixture.yaml")) `shouldBe` stackFixturePackages
-            
+            parseStackageYaml (decodeUtf8 $(embedFile "test/unit/fixtures/stack-fixture.yaml")) `shouldBe` stackFixturePackages
+ 
 stackFixturePackages :: Maybe Packages
 stackFixturePackages = Just $ Packages map
   where

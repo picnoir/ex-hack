@@ -1,23 +1,35 @@
 module ExHack.Stackage.Stack (
-  setup
+  setup,
+  build
 ) where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Text (unpack)
+import Data.Maybe (fromMaybe)
 import Control.Lens ((^.))
 import System.Exit (ExitCode(..))
 import System.Process (readProcessWithExitCode )
 
-import ExHack.Config (StackConfig, workDir, nbJobs, stackRoot)
+import ExHack.Config (StackConfig, workDir, nbJobs, 
+                      stackRoot, stackBin)
 
-setup :: MonadIO m => StackConfig -> m (Maybe Int)
+setup :: MonadIO m => StackConfig -> m (Maybe (Int, String))
 setup c = do
-  (ec, _, _) <- liftIO $ readProcessWithExitCode 
-      ("stack setup --work-dir=" 
-        <> unpack (c ^. workDir)
-        <> " --stack-root=" <> unpack (c ^. stackRoot)
-        <>  " -j" <> show (c ^. nbJobs))
-      [] ""
+  (ec, _, err) <- liftIO $ readProcessWithExitCode 
+      sb
+      ["setup",
+       "--stack-root", unpack (c ^. stackRoot),
+       "--work-dir", unpack (c ^. workDir),
+       "--install-ghc",
+       "--no-system-ghc",
+       "-j",show (c ^. nbJobs)] 
+      ""
   case ec of
     ExitSuccess -> pure Nothing
-    ExitFailure i -> pure $ Just i
+    ExitFailure i -> pure $ Just (i, err)
+  where
+    sb = fromMaybe "stack" $ c ^. stackBin
+
+build :: MonadIO m => StackConfig -> m (Maybe (Int, String))
+build = do
+  
