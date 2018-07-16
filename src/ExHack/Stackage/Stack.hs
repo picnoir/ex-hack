@@ -31,5 +31,7 @@ setup c = do
     sb = fromMaybe "stack" $ c ^. stackBin
 
 build :: MonadIO m => StackConfig -> m (Maybe (Int, String))
-build = do
-  
+build = undefined
+-- 1. Unzip content
+-- 2. Change dir
+-- 3. Run command

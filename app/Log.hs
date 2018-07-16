@@ -5,7 +5,7 @@ module Log (
 
 
 logProgress :: String -> String -> IO ()
-logProgress prefix log = putStrLn (prefix ++ log)
+logProgress prefix l = putStrLn (prefix ++ l)
 
 logTitle :: String -> IO ()
 logTitle txt = line >> putStrLn ("* " ++ txt ++ " *") >> line

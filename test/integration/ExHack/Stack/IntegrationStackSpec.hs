@@ -1,7 +1,7 @@
 module ExHack.Stack.IntegrationStackSpec (spec) where
 
 import Data.Maybe (isNothing)
-import Test.Hspec (Spec, describe, it, shouldSatisfy, shouldBe)
+import Test.Hspec (Spec, describe, it, shouldSatisfy)
 
 import qualified ExHack.Stackage.Stack as Stack (setup)
 import ExHack.Config (config)
