@@ -30,11 +30,13 @@ library
   build-depends:
       aeson,
       base >=4.7 && <5,
+      bytestring,
       Cabal,
       containers,
       filepath,
       lens,
       process,
+      tar,
       text,
       yaml,
       selda,
@@ -42,6 +44,7 @@ library
       zlib
   exposed-modules:
       ExHack.Config,
+      ExHack.Hackage.Hackage,
       ExHack.Stackage.Stack,
       ExHack.Stackage.StackageTypes,
       ExHack.Stackage.StackageParser,
@@ -100,7 +103,9 @@ test-suite integration-tests
   build-depends:
       base >=4.7 && <5
     , ex-hack
+    , file-embed
     , hspec
   other-modules:
-      ExHack.Stack.IntegrationStackSpec
+      ExHack.Stack.IntegrationStackSpec,
+      ExHack.Hackage.IntegrationHackageSpec
   default-language: Haskell2010

@@ -20,8 +20,6 @@ setup c = do
       ["setup",
        "--stack-root", unpack (c ^. stackRoot),
        "--work-dir", unpack (c ^. workDir),
-       "--install-ghc",
-       "--no-system-ghc",
        "-j",show (c ^. nbJobs)] 
       ""
   case ec of
