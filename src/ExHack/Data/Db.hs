@@ -4,14 +4,21 @@
 module ExHack.Data.Db (
   initDb,
   savePackages,
-  savePackageDeps
+  savePackageDeps,
+  savePackageMods
 ) where
 
-import Data.Maybe        (listToMaybe)
-import Data.Text         (Text, pack)
+import Data.Maybe                  (listToMaybe)
+import Data.Text                   (Text, pack)
 import Database.Selda    
-import ExHack.Types      (Package(..), getName,
-                          depsNames)
+import qualified ExHack.Types as T (Package(..))
+import ExHack.Types                (ModuleName, getName, depsNames)
+
+exposedModules :: Table (RowID :*: RowID :*: Text)
+exposedModules = table "exposedModules" $
+                   autoPrimary "id"
+                   :*: required "packID" `fk` (packages, packageId)
+                   :*: required "name"
 
 dependancies :: Table (RowID :*: RowID :*: RowID)
 dependancies = table "dependancies" $
@@ -19,8 +26,8 @@ dependancies = table "dependancies" $
                    :*: required "packID" `fk` (packages, packageId)
                    :*: required "depID" `fk` (packages, packageId)
 
-packageId :: Selector (RowID :*: (Text :*: (Text :*: (Text :*: Text)))) RowID
-packageName :: Selector (RowID :*: (Text :*: (Text :*: (Text :*: Text)))) Text
+packageId :: Selector (RowID :*: Text :*: Text :*: Text :*: Text) RowID
+packageName :: Selector (RowID :*: Text :*: Text :*: Text :*: Text) Text
 packages :: Table (RowID :*: Text :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
   = tableWithSelectors "packages" $
@@ -32,7 +39,7 @@ packages :: Table (RowID :*: Text :*: Text :*: Text :*: Text)
 
 -- | Create the internal database schema.
 initDb :: SeldaM ()
-initDb = tryCreateTable packages >> tryCreateTable dependancies 
+initDb = tryCreateTable packages >> tryCreateTable dependancies >> tryCreateTable exposedModules
 
 -- | Save a package dependancies.
 --
@@ -41,7 +48,7 @@ initDb = tryCreateTable packages >> tryCreateTable dependancies
 --
 -- You should make sure your package database is already
 -- populated before using this.
-savePackageDeps :: Package -> SeldaM ()
+savePackageDeps :: T.Package -> SeldaM ()
 savePackageDeps p = do
   mpid <- query $ do
     pks <- select packages
@@ -59,8 +66,14 @@ savePackageDeps p = do
       mapM_ (\depId -> insert_ dependancies [ def :*: depId :*: pid ]) (listToMaybe mdid)
 
 -- | Save a package list in the DB.
-savePackages :: [Package] -> SeldaM ()
+savePackages :: [T.Package] -> SeldaM ()
 savePackages xs = (insert_ packages . generateCols) `mapM_` xs 
   where
-    generateCols p = [def :*: getName p :*: cabalFile p :*: (pack . tarballPath) p :*: hoogleFile p]
+    generateCols p = [def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p :*: T.hoogleFile p]
 
+-- | Save the exposed modules of a package in the DB.
+savePackageMods :: Maybe [ModuleName] -> RowID -> SeldaM ()
+savePackageMods (Just xs) pid = (insert_ exposedModules . generateCols) `mapM_` xs
+  where
+    generateCols m = [def :*: pid :*: pack (show m)] 
+savePackageMods _ _ = pure ()

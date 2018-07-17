@@ -45,6 +45,7 @@ library
       zlib
   exposed-modules:
       ExHack.Config,
+      ExHack.Ghc,
       ExHack.Hackage.Hackage,
       ExHack.Stackage.Stack,
       ExHack.Stackage.StackageTypes,
