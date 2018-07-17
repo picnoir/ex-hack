@@ -33,6 +33,7 @@ library
       bytestring,
       Cabal,
       containers,
+      directory,
       filepath,
       lens,
       process,

@@ -7,6 +7,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Text (unpack)
 import Data.Maybe (fromMaybe)
 import Control.Lens ((^.))
+import System.Directory (setCurrentDirectory)
 import System.Exit (ExitCode(..))
 import System.Process (readProcessWithExitCode )
 
@@ -14,22 +15,23 @@ import ExHack.Config (StackConfig, workDir, nbJobs,
                       stackRoot, stackBin)
 
 setup :: MonadIO m => StackConfig -> m (Maybe (Int, String))
-setup c = do
+setup c = runStackCommand c ["setup"]
+
+build :: MonadIO m => StackConfig -> FilePath -> m (Maybe (Int, String))
+build c fp = do
+  liftIO $ setCurrentDirectory fp
+  runStackCommand c ["build"]
+
+runStackCommand :: MonadIO m => StackConfig -> [String] -> m (Maybe (Int, String))
+runStackCommand c cmd = do
   (ec, _, err) <- liftIO $ readProcessWithExitCode 
-      sb
-      ["setup",
-       "--stack-root", unpack (c ^. stackRoot),
+      stackPath
+      (cmd <> ["--stack-root", unpack (c ^. stackRoot),
        "--work-dir", unpack (c ^. workDir),
-       "-j",show (c ^. nbJobs)] 
+       "-j",show (c ^. nbJobs)])
       ""
   case ec of
     ExitSuccess -> pure Nothing
     ExitFailure i -> pure $ Just (i, err)
   where
-    sb = fromMaybe "stack" $ c ^. stackBin
-
-build :: MonadIO m => StackConfig -> m (Maybe (Int, String))
-build = undefined
--- 1. Unzip content
--- 2. Change dir
--- 3. Run command
+    stackPath =  fromMaybe "stack" $ c ^. stackBin
