@@ -4,18 +4,21 @@ module ExHack.Types (
   PackageName,
   PackageDlDesc(..),
   UnparsedPackage(..),
+  ModuleName(..),
   mkPackageName,
   mkVersion,
   getName,
   depsNames,
-  packagedlDescName
+  packagedlDescName,
+  fromComponents
 ) where
 
 import Data.Set (Set, toList)
 import Data.Text (Text, pack)
-import Distribution.Types.PackageId
-import Distribution.Types.PackageName
-import Distribution.Version
+import Distribution.ModuleName (ModuleName(..), fromComponents)
+import Distribution.Types.PackageId (PackageIdentifier(..), pkgName)
+import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
+import Distribution.Version (mkVersion)
 import System.FilePath (FilePath)
 
 data Package = Package {
@@ -23,7 +26,8 @@ data Package = Package {
   deps :: Set PackageName,
   cabalFile :: Text,
   tarballPath :: FilePath,
-  hoogleFile :: Text 
+  hoogleFile :: Text,
+  exposedModules :: Maybe [ModuleName]
 } deriving (Eq, Show)
 
 -- | Intermediate package description
