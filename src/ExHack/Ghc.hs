@@ -1,6 +1,7 @@
 module ExHack.Ghc (
   UnitId(..),
   TypecheckedSource,
+  DesugaredModule(..),
   getDesugaredMod,
   getModUnitId,
   getModName,
@@ -19,16 +20,19 @@ import GHC (runGhc, getSessionDynFlags,
             moduleNameString, moduleName,
             dm_typechecked_module, tm_typechecked_source,
             TypecheckedSource)
+import GHC.Paths (libdir)
 import Module (UnitId(..))
 import HscTypes (ModGuts(..))
 import Avail (AvailInfo(..))
 import Name (nameStableString)
 
 -- | TODO: make parameters type-safe
-getDesugaredMod :: (MonadIO m) => String -> String -> String -> m DesugaredModule 
-getDesugaredMod libdir fileName modName =
+getDesugaredMod :: (MonadIO m) => FilePath -> String -> m DesugaredModule 
+getDesugaredMod fileName modName =
   liftIO . runGhc (Just libdir) $ do
+    -- TODO: chdir??
     dflags <- getSessionDynFlags
+    -- TODO: add Stack lib path in dyn flags.
     _ <- setSessionDynFlags dflags
     target <- guessTarget fileName Nothing
     setTargets [target]

@@ -35,6 +35,7 @@ library
       containers,
       directory,
       ghc,
+      ghc-paths,
       filepath,
       lens,
       process,
