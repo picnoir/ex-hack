@@ -1,16 +1,20 @@
+{-# LANGUAGE LambdaCase #-}
 module ExHack.Hackage.Hackage (
     unpackHackageTarball,
     loadExposedModules,
-    getTarballCabal
+    getTarballDesc
 ) where
 
+import Data.List (isSuffixOf)
 import Data.Maybe (fromMaybe)
+import qualified Data.Text.IO as T (readFile)
 import Distribution.ModuleName (ModuleName, toFilePath)
 import Codec.Compression.GZip (decompress)
 import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS (ByteString)
 import qualified Data.ByteString.Lazy as BL (fromStrict)
+import System.Directory (listDirectory)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod)
@@ -31,10 +35,23 @@ unpackHackageTarball dir tb = do
 
 -- | Get the tarball description of a directory. Returns Nothing if
 -- the specified directory is empty.
-getTarballCabal :: (MonadIO m) => 
+getTarballDesc :: (MonadIO m) => 
   FilePath -- ^ 'FilePath' that may contain a tarball. 
   -> m (Maybe TarballDesc)
-getTarballCabal _ = undefined
+getTarballDesc fp = do
+  f <- Just <$> liftIO (listDirectory fp)
+  let mcfp = f >>= getCabalFp >>= \case
+        [] -> Nothing
+        a  -> Just $ head a
+  case mcfp of
+    Nothing -> pure Nothing
+    Just cfp -> do
+      fcontent <- liftIO $ T.readFile cfp
+      pure . Just $ TarballDesc (fp, fcontent)
+  where
+    -- Filters .cabal files out of a list of files.
+    getCabalFp = Just <$> filter (\x -> ".cabal" `isSuffixOf` x) 
+
 
 loadExposedModules :: (MonadIO m) => Package -> m [DesugaredModule] 
 loadExposedModules xs = loadModule `mapM` fromMaybe mempty (exposedModules xs)
