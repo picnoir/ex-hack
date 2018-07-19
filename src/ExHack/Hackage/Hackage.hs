@@ -1,6 +1,7 @@
 module ExHack.Hackage.Hackage (
     unpackHackageTarball,
-    loadExposedModules
+    loadExposedModules,
+    getTarballCabal
 ) where
 
 import Data.Maybe (fromMaybe)
@@ -13,9 +14,13 @@ import qualified Data.ByteString.Lazy as BL (fromStrict)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod)
-import ExHack.Types (Package(exposedModules))
+import ExHack.Types (Package(exposedModules), TarballDesc(..))
 
-unpackHackageTarball :: (MonadIO m) => FilePath -> BS.ByteString -> m FilePath
+-- | Unpack a tarball to a specified directory.
+unpackHackageTarball :: (MonadIO m) => 
+  FilePath -- ^ 'FilePath' pointing to the directory we want to extract the tarball to. 
+  -> BS.ByteString -- ^ Tarball in the 'ByteString'.
+  -> m FilePath -- ^ Newly created directory containing the extracted tarball.
 unpackHackageTarball dir tb = do
   let rp = Tar.read . decompress $ BL.fromStrict tb
   liftIO $ Tar.unpack dir rp 
@@ -23,6 +28,13 @@ unpackHackageTarball dir tb = do
   where
     getRootPath (Tar.Next e _) = Tar.entryPath e
     getRootPath _ = error "Cannot find tar's root directory."
+
+-- | Get the tarball description of a directory. Returns Nothing if
+-- the specified directory is empty.
+getTarballCabal :: (MonadIO m) => 
+  FilePath -- ^ 'FilePath' that may contain a tarball. 
+  -> m (Maybe TarballDesc)
+getTarballCabal _ = undefined
 
 loadExposedModules :: (MonadIO m) => Package -> m [DesugaredModule] 
 loadExposedModules xs = loadModule `mapM` fromMaybe mempty (exposedModules xs)

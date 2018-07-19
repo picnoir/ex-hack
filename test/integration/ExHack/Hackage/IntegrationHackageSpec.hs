@@ -20,3 +20,5 @@ spec = describe "hackage" $ do
           tbp <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
           r <- build config tbp
           r `shouldSatisfy` isNothing
+
+          

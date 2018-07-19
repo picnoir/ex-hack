@@ -18,7 +18,7 @@ import Distribution.PackageDescription.Parsec (ParseResult, runParseResult,
                                                parseGenericPackageDescription)
 import Distribution.Types.Dependency (Dependency, depPkgName) 
 
-import ExHack.Types (Package(..), UnparsedPackage(..), PackageName,
+import ExHack.Types (Package(..), TarballDesc(..), PackageName,
                      ModuleName(..), pkgName)
 
 getSuccParse :: [ParseResult Package] -> [Package]
@@ -28,8 +28,8 @@ getSuccParse = foldr appendParseResult []
                                     (_, Left _) -> xs
                                     (_, Right x) -> x:xs
 
-parseCabalFile :: UnparsedPackage -> ParseResult Package
-parseCabalFile (UnparsedPackage (tp, cf, hf)) = Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> pure hf  <*> expMods 
+parseCabalFile :: TarballDesc -> ParseResult Package
+parseCabalFile (TarballDesc (tp, cf)) = Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> expMods 
     where
       gpackageDesc = parseGenericPackageDescription $ encodeUtf8 cf
       packN = package .  packageDescription <$> gpackageDesc

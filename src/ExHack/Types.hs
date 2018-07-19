@@ -3,7 +3,7 @@ module ExHack.Types (
   PackageIdentifier(..),
   PackageName,
   PackageDlDesc(..),
-  UnparsedPackage(..),
+  TarballDesc(..),
   ModuleName(..),
   mkPackageName,
   mkVersion,
@@ -26,16 +26,22 @@ data Package = Package {
   deps :: Set PackageName,
   cabalFile :: Text,
   tarballPath :: FilePath,
-  hoogleFile :: Text,
   exposedModules :: Maybe [ModuleName]
 } deriving (Eq, Show)
 
--- | Intermediate package description
---   used till we parse the data necessary
+-- | Intermediate package description used till we parse the data necessary
 --   to generate the proper package description.
+--
 newtype PackageDlDesc = PackageDlDesc (Text,Text,Text,Text)
 
-newtype UnparsedPackage = UnparsedPackage (String, Text, Text)
+-- | Informations extracted from a package entry not yet extracted from its tarball.
+--
+-- Two elements:
+--
+--   * Filepath to the tarball.
+--   * The cabal file of this package.
+--
+newtype TarballDesc = TarballDesc (FilePath, Text)
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _, _)) = n

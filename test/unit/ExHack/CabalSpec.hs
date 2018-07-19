@@ -9,7 +9,7 @@ import Data.Set (fromList)
 import Test.Hspec (Spec, describe, it, shouldBe)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, runParseResult)
-import ExHack.Types (PackageIdentifier(..), UnparsedPackage(..), Package(..),
+import ExHack.Types (PackageIdentifier(..), TarballDesc(..), Package(..),
                     mkVersion, ModuleName(..), fromComponents)
 
 spec :: Spec
@@ -17,10 +17,10 @@ spec = describe "parseCabalFile" $
           it "should parse a file" $ do
             let 
               cf  = decodeUtf8 $(embedFile "test/unit/fixtures/cabal-fixture.cabal")
-              res = parseCabalFile $ UnparsedPackage ("", cf, "")
+              res = parseCabalFile $ TarballDesc ("", cf)
             case runParseResult res of
                 (_, Left err) -> fail $ show err
-                (_, Right r) -> r `shouldBe` Package (PackageIdentifier "ad" $ mkVersion [4, 3, 5]) (fromList ["array", "base", "comonad", "containers", "data-reify", "erf", "free", "nats", "reflection", "semigroups", "transformers", "directory", "doctest", "filepath", "criterion"]) cf "" "" exposedMods
+                (_, Right r) -> r `shouldBe` Package (PackageIdentifier "ad" $ mkVersion [4, 3, 5]) (fromList ["array", "base", "comonad", "containers", "data-reify", "erf", "free", "nats", "reflection", "semigroups", "transformers", "directory", "doctest", "filepath", "criterion"]) cf "" exposedMods
 
 
 exposedMods :: Maybe [ModuleName]

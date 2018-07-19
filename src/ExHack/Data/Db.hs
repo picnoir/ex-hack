@@ -26,16 +26,15 @@ dependancies = table "dependancies" $
                    :*: required "packID" `fk` (packages, packageId)
                    :*: required "depID" `fk` (packages, packageId)
 
-packageId :: Selector (RowID :*: Text :*: Text :*: Text :*: Text) RowID
-packageName :: Selector (RowID :*: Text :*: Text :*: Text :*: Text) Text
-packages :: Table (RowID :*: Text :*: Text :*: Text :*: Text)
+packageId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
+packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text
+packages :: Table (RowID :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
   = tableWithSelectors "packages" $
               autoPrimary "packageId"
               :*: required "name"
               :*: required "tarball_path"
               :*: required "cabal_file"
-              :*: required "hoogle_file"
 
 -- | Create the internal database schema.
 initDb :: SeldaM ()
@@ -69,7 +68,7 @@ savePackageDeps p = do
 savePackages :: [T.Package] -> SeldaM ()
 savePackages xs = (insert_ packages . generateCols) `mapM_` xs 
   where
-    generateCols p = [def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p :*: T.hoogleFile p]
+    generateCols p = [def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p ]
 
 -- | Save the exposed modules of a package in the DB.
 savePackageMods :: Maybe [ModuleName] -> RowID -> SeldaM ()

@@ -18,7 +18,7 @@ import System.Directory (doesFileExist, removeFile, listDirectory)
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Stackage.StackageParser
 import ExHack.Types (Package(..), PackageDlDesc(..),
-                     UnparsedPackage(..), packagedlDescName, packagedlDescName)
+                     TarballDesc(..), packagedlDescName, packagedlDescName)
 import ExHack.Data.Db (initDb, savePackages,
                        savePackageDeps)
 
@@ -35,8 +35,8 @@ main = do
   let packages = fromJust $ parseStackageYaml stackageYaml
       hackageUrl = getHackageUrls packages
   logTitle "[+] STEP 2: bootstrapping GHC"
-  step "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles $ sDlHack hackageUrl
-  step "[+] STEP 3: Generating dependancy graph" (return True) (sGenDepGraph hackageUrl)
+  step "[+] STEP 3: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles $ sDlHack hackageUrl
+  step "[+] STEP 4: Generating dependancy graph" (return True) (sGenDepGraph hackageUrl)
 
 sGenerateDb :: IO ()
 sGenerateDb = withSQLite dbFilePath initDb
@@ -100,7 +100,7 @@ sGenDepGraph pkgsDesc = do
   -- 1
   putStrLn "[+] Parsing cabal files."
   pkgs <- readPkgsFiles `mapM` pkgsDesc
-  let pkgs' = getSuccParse (parseCabalFile . UnparsedPackage <$> pkgs)
+  let pkgs' = getSuccParse (parseCabalFile <$> pkgs)
   -- 2
   withSQLite dbFilePath $ do
     liftIO $ putStrLn "[+] Saving packages to DB..."
@@ -112,12 +112,11 @@ sGenDepGraph pkgsDesc = do
     liftIO $ putStrLn "[+] Done."
   return ()
     where
-      readPkgsFiles :: PackageDlDesc -> IO (String, Text, Text)
+      readPkgsFiles :: PackageDlDesc -> IO TarballDesc
       readPkgsFiles p = do
         let tp = tarballsDir <> T.unpack (packagedlDescName p) <> ".tar.gz"
         cf <- readFile $ cabalFilesDir <> T.unpack (packagedlDescName p) <> ".cabal"
-        hf <- readFile $ hoogleFilesDir <> T.unpack (packagedlDescName p) <> ".txt"
-        return (tp,cf,hf)
+        pure $ TarballDesc (tp,cf)
 
 foldInsertDep :: Int -> Package -> SeldaM Int -> SeldaM Int
 foldInsertDep totalDeps pkg step = do 
