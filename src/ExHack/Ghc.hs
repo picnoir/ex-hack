@@ -24,7 +24,8 @@ import GHC.Paths (libdir)
 import Module (UnitId(..))
 import HscTypes (ModGuts(..))
 import Avail (AvailInfo(..))
-import Name (nameStableString)
+import Name ( getOccString)
+
 
 -- | TODO: make parameters type-safe
 getDesugaredMod :: (MonadIO m) => FilePath -> String -> m DesugaredModule 
@@ -54,5 +55,5 @@ getContent :: DesugaredModule -> TypecheckedSource
 getContent = tm_typechecked_source . dm_typechecked_module
 
 getAvName :: AvailInfo -> String
-getAvName (Avail n) = nameStableString n
-getAvName (AvailTC n _ _) = nameStableString n
+getAvName (Avail n) = getOccString n
+getAvName (AvailTC n _ _) = getOccString n

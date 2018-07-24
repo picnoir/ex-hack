@@ -2,7 +2,9 @@
 module ExHack.Hackage.Hackage (
     unpackHackageTarball,
     loadExposedModules,
-    getTarballDesc
+    getTarballDesc,
+    getPackageExports,
+    PackageExports(..)
 ) where
 
 import Data.List (isSuffixOf, intercalate)
@@ -17,8 +19,12 @@ import qualified Data.ByteString.Lazy as BL (fromStrict)
 import System.Directory (listDirectory, makeAbsolute)
 import System.FilePath (FilePath, (</>))
 
-import ExHack.Ghc (DesugaredModule, getDesugaredMod)
+import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
 import ExHack.Types (Package(exposedModules), TarballDesc(..))
+
+newtype PackageExports = PackageExports [(ModuleName, [String])]
+  deriving (Show, Eq)
+
 
 -- | Unpack a tarball to a specified directory.
 unpackHackageTarball :: (MonadIO m) => 
@@ -53,12 +59,18 @@ getTarballDesc fp = do
     -- Filters .cabal files out of a list of files.
     getCabalFp = Just <$> filter (isSuffixOf ".cabal")
 
+getPackageExports :: (MonadIO m) => Package -> m PackageExports
+getPackageExports p = do
+  em <- loadExposedModules p
+  pure $ PackageExports $ getExports <$> em
+    where
+      getExports (mn, dm) = (mn, getModExports dm) 
 
-loadExposedModules :: (MonadIO m) => Package -> m [DesugaredModule] 
-loadExposedModules xs = loadModule `mapM` fromMaybe mempty (exposedModules xs)
+loadExposedModules :: (MonadIO m) => Package -> m [(ModuleName, DesugaredModule)] 
+loadExposedModules p = loadModule `mapM` fromMaybe mempty (exposedModules p)
 
-loadModule :: (MonadIO m) => ModuleName -> m DesugaredModule
-loadModule p = getDesugaredMod fn modn
+loadModule :: (MonadIO m) => ModuleName -> m (ModuleName, DesugaredModule)
+loadModule p = getDesugaredMod fn modn >>= \m -> pure (p,m)
   where
     modn = intercalate "." $ components p
     fn = "./" <> toFilePath p

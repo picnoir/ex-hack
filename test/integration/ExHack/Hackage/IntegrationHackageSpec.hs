@@ -9,9 +9,8 @@ import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 
 import ExHack.Cabal.CabalParser(parseCabalFile, getSuccParse)
 import ExHack.Config (StackConfig(..))
-import ExHack.Ghc (getModExports)
 import ExHack.Hackage.Hackage (unpackHackageTarball, getTarballDesc,
-                              loadExposedModules)
+                              getPackageExports, PackageExports(..))
 import ExHack.Stackage.Stack(build)
 
 config :: StackConfig
@@ -31,6 +30,9 @@ spec = describe "hackage" $ do
           _ <- build config tbp
           tbdm <- fromJust <$> getTarballDesc tbp
           let p = head $ getSuccParse [parseCabalFile tbdm]
-          mods <- loadExposedModules p
-          let exports = getModExports <$> mods
-          exports `shouldBe` [[]]
+          exports <- getPackageExports p
+          exports `shouldBe` PackageExports [("System.TimeIt", ["timeIt", "timeItT"])]
+          -- 1: Parse cabal file.
+          -- 2: Load file in GHC
+          -- 3: Get a desugared modules.
+          -- 4: Get package exports. -}
