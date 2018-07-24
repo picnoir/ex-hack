@@ -5,16 +5,16 @@ module ExHack.Hackage.Hackage (
     getTarballDesc
 ) where
 
-import Data.List (isSuffixOf)
+import Data.List (isSuffixOf, intercalate)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text.IO as T (readFile)
-import Distribution.ModuleName (ModuleName, toFilePath)
+import Distribution.ModuleName (ModuleName, toFilePath, components)
 import Codec.Compression.GZip (decompress)
 import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS (ByteString)
 import qualified Data.ByteString.Lazy as BL (fromStrict)
-import System.Directory (listDirectory)
+import System.Directory (listDirectory, makeAbsolute)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod)
@@ -28,7 +28,8 @@ unpackHackageTarball :: (MonadIO m) =>
 unpackHackageTarball dir tb = do
   let rp = Tar.read . decompress $ BL.fromStrict tb
   liftIO $ Tar.unpack dir rp 
-  pure $ dir </> getRootPath rp 
+  adir <- liftIO $ makeAbsolute dir
+  pure $ adir </> getRootPath rp 
   where
     getRootPath (Tar.Next e _) = Tar.entryPath e
     getRootPath _ = error "Cannot find tar's root directory."
@@ -50,7 +51,7 @@ getTarballDesc fp = do
       pure . Just $ TarballDesc (fp, fcontent)
   where
     -- Filters .cabal files out of a list of files.
-    getCabalFp = Just <$> filter (\x -> ".cabal" `isSuffixOf` x) 
+    getCabalFp = Just <$> filter (isSuffixOf ".cabal")
 
 
 loadExposedModules :: (MonadIO m) => Package -> m [DesugaredModule] 
@@ -59,5 +60,5 @@ loadExposedModules xs = loadModule `mapM` fromMaybe mempty (exposedModules xs)
 loadModule :: (MonadIO m) => ModuleName -> m DesugaredModule
 loadModule p = getDesugaredMod fn modn
   where
-    modn = show p
+    modn = intercalate "." $ components p
     fn = "./" <> toFilePath p

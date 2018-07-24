@@ -6,7 +6,7 @@ module ExHack.Ghc (
   getModUnitId,
   getModName,
   getModExports,
-  getContent
+  getContent,
   ) where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -28,7 +28,8 @@ import Name (nameStableString)
 
 -- | TODO: make parameters type-safe
 getDesugaredMod :: (MonadIO m) => FilePath -> String -> m DesugaredModule 
-getDesugaredMod fileName modName =
+getDesugaredMod fileName modName = do
+  liftIO $ putStrLn $ "Desugaring mod " <> modName <> " from " <> fileName
   liftIO . runGhc (Just libdir) $ do
     -- TODO: chdir??
     dflags <- getSessionDynFlags

@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module ExHack.Hackage.IntegrationHackageSpec (spec) where
 
+import Data.List  (isSuffixOf)
 import Data.Maybe (isNothing, fromJust)
 import Data.FileEmbed (embedFile)
 import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
@@ -20,7 +21,7 @@ spec :: Spec
 spec = describe "hackage" $ do
         it "should extract the content of a tarball" $ do
           r <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
-          r `shouldBe` "./test/integration/workdir/timeit-1.0.0.0/"
+          r `shouldSatisfy` isSuffixOf "test/integration/workdir/timeit-1.0.0.0/"
         it "should build a tarball" $ do
           tbp <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
           r <- build config tbp
@@ -32,8 +33,4 @@ spec = describe "hackage" $ do
           let p = head $ getSuccParse [parseCabalFile tbdm]
           mods <- loadExposedModules p
           let exports = getModExports <$> mods
-          exports `shouldBe` []
-          -- 1: Parse cabal file.
-          -- 2: Load file in GHC
-          -- 3: Get a desugared modules.
-          -- 4: Get package exports. -}
+          exports `shouldBe` [[]]

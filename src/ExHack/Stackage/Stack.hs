@@ -19,11 +19,13 @@ setup c = runStackCommand c ["setup"]
 
 build :: MonadIO m => StackConfig -> FilePath -> m (Maybe (Int, String))
 build c fp = do
+  liftIO $ putStrLn $ "cd " <> fp
   liftIO $ setCurrentDirectory fp
   runStackCommand c ["build"]
 
 runStackCommand :: MonadIO m => StackConfig -> [String] -> m (Maybe (Int, String))
 runStackCommand c cmd = do
+  liftIO . putStrLn $ stackPath <> " " <> concat cmd <> " --stack-root " <> unpack (c ^. stackRoot) <> " " <> "--work-dir " <> unpack (c ^. workDir) <> " " <> "-j " <> show (c ^. nbJobs)
   (ec, _, err) <- liftIO $ readProcessWithExitCode 
       stackPath
       (cmd <> ["--stack-root", unpack (c ^. stackRoot),
