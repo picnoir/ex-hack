@@ -12,7 +12,7 @@ import System.Exit (ExitCode(..))
 import System.Process (readProcessWithExitCode )
 
 import ExHack.Config (StackConfig, workDir, nbJobs, 
-                      stackRoot, stackBin)
+                      stackRoot, stackBin, gccBin)
 
 setup :: MonadIO m => StackConfig -> m (Maybe (Int, String))
 setup c = runStackCommand c ["setup"]
@@ -25,15 +25,17 @@ build c fp = do
 
 runStackCommand :: MonadIO m => StackConfig -> [String] -> m (Maybe (Int, String))
 runStackCommand c cmd = do
-  liftIO . putStrLn $ stackPath <> " " <> concat cmd <> " --stack-root " <> unpack (c ^. stackRoot) <> " " <> "--work-dir " <> unpack (c ^. workDir) <> " " <> "-j " <> show (c ^. nbJobs)
+  liftIO . putStrLn $ stackPath <> " " <> concat cmd <> " --stack-root " <> unpack (c ^. stackRoot) <> " " <> "--work-dir " <> unpack (c ^. workDir) <> " " <> "-j " <> show (c ^. nbJobs) <> " --with-gcc " <> gccPath
   (ec, _, err) <- liftIO $ readProcessWithExitCode 
       stackPath
       (cmd <> ["--stack-root", unpack (c ^. stackRoot),
        "--work-dir", unpack (c ^. workDir),
-       "-j",show (c ^. nbJobs)])
+       "-j",show (c ^. nbJobs),
+       "--with-gcc", gccPath])
       ""
   case ec of
     ExitSuccess -> pure Nothing
     ExitFailure i -> pure $ Just (i, err)
   where
     stackPath =  fromMaybe "stack" $ c ^. stackBin
+    gccPath = fromMaybe "gcc" $ c ^. gccBin

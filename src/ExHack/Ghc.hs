@@ -9,7 +9,9 @@ module ExHack.Ghc (
   getContent,
   ) where
 
+import Data.List (intercalate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Distribution.ModuleName (ModuleName, components, toFilePath)
 import GHC (runGhc, getSessionDynFlags,
             setSessionDynFlags, guessTarget,
             setTargets, load, LoadHowMuch(..),
@@ -27,20 +29,20 @@ import Avail (AvailInfo(..))
 import Name ( getOccString)
 
 
--- | TODO: make parameters type-safe
-getDesugaredMod :: (MonadIO m) => FilePath -> String -> m DesugaredModule 
-getDesugaredMod fileName modName = do
+getDesugaredMod :: (MonadIO m) => ModuleName -> m DesugaredModule 
+getDesugaredMod mn = do
   liftIO $ putStrLn $ "Desugaring mod " <> modName <> " from " <> fileName
   liftIO . runGhc (Just libdir) $ do
-    -- TODO: chdir??
     dflags <- getSessionDynFlags
-    -- TODO: add Stack lib path in dyn flags.
     _ <- setSessionDynFlags dflags
     target <- guessTarget fileName Nothing
     setTargets [target]
     _ <- load LoadAllTargets
     modSum <- getModSummary $ mkModuleName modName
     parseModule modSum >>= typecheckModule >>= desugarModule
+  where
+    modName = intercalate "." $ components mn 
+    fileName = "./" <> toFilePath mn 
 
 getModUnitId :: DesugaredModule -> UnitId
 getModUnitId = moduleUnitId . mg_module . dm_core_module

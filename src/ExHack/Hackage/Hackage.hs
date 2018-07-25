@@ -7,10 +7,10 @@ module ExHack.Hackage.Hackage (
     PackageExports(..)
 ) where
 
-import Data.List (isSuffixOf, intercalate)
+import Data.List (isSuffixOf)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text.IO as T (readFile)
-import Distribution.ModuleName (ModuleName, toFilePath, components)
+import Distribution.ModuleName (ModuleName)
 import Codec.Compression.GZip (decompress)
 import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -70,7 +70,4 @@ loadExposedModules :: (MonadIO m) => Package -> m [(ModuleName, DesugaredModule)
 loadExposedModules p = loadModule `mapM` fromMaybe mempty (exposedModules p)
 
 loadModule :: (MonadIO m) => ModuleName -> m (ModuleName, DesugaredModule)
-loadModule p = getDesugaredMod fn modn >>= \m -> pure (p,m)
-  where
-    modn = intercalate "." $ components p
-    fn = "./" <> toFilePath p
+loadModule mn = getDesugaredMod mn >>= \m -> pure (mn,m)

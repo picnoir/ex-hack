@@ -24,6 +24,7 @@ import System.FilePath (FilePath)
 data Package = Package {
   name :: PackageIdentifier,
   deps :: Set PackageName,
+  cincludes :: Maybe FilePath,
   cabalFile :: Text,
   tarballPath :: FilePath,
   exposedModules :: Maybe [ModuleName]
