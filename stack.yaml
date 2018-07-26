@@ -16,7 +16,7 @@
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
 resolver: nightly-2018-07-11
-
+allow-newer: true
 # User packages to be built.
 # Various formats can be used as shown in the example below.
 #
@@ -39,7 +39,10 @@ packages:
 - .
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: [HDBC-sqlite3-2.3.3.1]
+extra-deps: 
+- git: https://github.com/DanielG/cabal-helper.git
+  commit: 5e2eb803e82e663caa6cd1252a790ba4a1c43adb
+- cabal-plan-0.3.0.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
