@@ -31,7 +31,7 @@ library
       aeson,
       base >=4.7 && <5,
       bytestring,
-      Cabal,
+      Cabal >= 2.2.0.1,
       containers,
       directory,
       ghc,
