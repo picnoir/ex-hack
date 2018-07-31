@@ -1,6 +1,6 @@
 { compiler ? "ghc843"
-, rev     ? "49bdae006e66e70ad3245a463edc01b5749250d3"
-, sha256  ? "1ijsifmap47nfzg0spny94lmj66y3x3x8i6vs471bnjamka3dx8p"
+, rev     ? "cd3283f9218b70fdf39640ba1be6fa16e137c209"
+, sha256  ? "1kwffir31hnp1q7cs6h6vgbi4n3byhrv343k99kirp6sf87k99dm"
 , pkgs ?
     if builtins.compareVersions builtins.nixVersion "2.0" < 0
     then abort "Exhs requires at least nix 2.0"
