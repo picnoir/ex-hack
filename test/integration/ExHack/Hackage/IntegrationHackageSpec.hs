@@ -9,7 +9,7 @@ import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 import System.Directory (makeAbsolute)
 
 import ExHack.Cabal.CabalParser(parseCabalFile, getSuccParse)
-import ExHack.Cabal.Cabal(build, installDeps)
+import ExHack.Cabal.Cabal(buildPackage)
 import ExHack.Hackage.Hackage (unpackHackageTarball, getTarballDesc,
                               getPackageExports, PackageExports(..))
 
@@ -23,17 +23,17 @@ spec = describe "hackage" $ do
           r `shouldSatisfy` isSuffixOf "test/integration/workdir/timeit-1.0.0.0/"
         it "should build a tarball" $ do
           tbp <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
-          d <- installDeps
+          d <- buildPackage tbp
           d `shouldSatisfy` isNothing
           {-r <- build 
           r `shouldSatisfy` isNothing -}
         it "should retrieve timeIt exports" $ do
           tbp <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
-          _ <- installDeps
-          _ <- build
+          _ <- buildPackage tbp
           tbdm <- fromJust <$> getTarballDesc tbp
+          True `shouldBe` True
           let p = head $ getSuccParse [parseCabalFile tbdm]
-          exports <- getPackageExports p
+          exports <- getPackageExports tbp p
           exports `shouldBe` PackageExports [("System.TimeIt", ["timeIt", "timeItT"])]
           {-
         it "should retrieve text exports" $ do

@@ -16,7 +16,7 @@ import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS (ByteString)
 import qualified Data.ByteString.Lazy as BL (fromStrict)
-import System.Directory (listDirectory, makeAbsolute)
+import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
@@ -53,15 +53,15 @@ getTarballDesc fp = do
   case mcfp of
     Nothing -> pure Nothing
     Just cfp -> do
-      fcontent <- liftIO $ T.readFile cfp
+      fcontent <- liftIO $ T.readFile (fp </> cfp)
       pure . Just $ TarballDesc (fp, fcontent)
   where
     -- Filters .cabal files out of a list of files.
     getCabalFp = Just <$> filter (isSuffixOf ".cabal")
 
-getPackageExports :: (MonadIO m) => Package -> m PackageExports
-getPackageExports p = do
-  em <- loadExposedModules p
+getPackageExports :: (MonadIO m) => FilePath -> Package -> m PackageExports
+getPackageExports fp p = do
+  em <- liftIO $ withCurrentDirectory fp (loadExposedModules p)
   pure $ PackageExports $ getExports <$> em
     where
       getExports (mn, dm) = (mn, getModExports dm) 
