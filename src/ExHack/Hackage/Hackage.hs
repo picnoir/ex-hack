@@ -59,15 +59,16 @@ getTarballDesc fp = do
     -- Filters .cabal files out of a list of files.
     getCabalFp = Just <$> filter (isSuffixOf ".cabal")
 
+-- | Retrieve the exported symbols of a cabal package.
 getPackageExports :: (MonadIO m) => FilePath -> Package -> m PackageExports
-getPackageExports fp p = do
-  em <- liftIO $ withCurrentDirectory fp (loadExposedModules p)
+getPackageExports pfp p = do
+  em <- liftIO $ withCurrentDirectory pfp (loadExposedModules pfp p)
   pure $ PackageExports $ getExports <$> em
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 
-loadExposedModules :: (MonadIO m) => Package -> m [(ModuleName, DesugaredModule)] 
-loadExposedModules p = loadModule `mapM` fromMaybe mempty (exposedModules p)
+loadExposedModules :: (MonadIO m) => FilePath -> Package -> m [(ModuleName, DesugaredModule)] 
+loadExposedModules pfp p = (loadModule pfp) `mapM` fromMaybe mempty (exposedModules p)
 
-loadModule :: (MonadIO m) => ModuleName -> m (ModuleName, DesugaredModule)
-loadModule mn = getDesugaredMod mn >>= \m -> pure (mn,m)
+loadModule :: (MonadIO m) => FilePath -> ModuleName -> m (ModuleName, DesugaredModule)
+loadModule pfp mn = getDesugaredMod pfp mn >>= \m -> pure (mn,m)
