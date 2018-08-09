@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 module ExHack.Ghc (
   UnitId(..),
   TypecheckedSource,
@@ -7,11 +6,14 @@ module ExHack.Ghc (
   getModUnitId,
   getModName,
   getModExports,
+  getModImports,
   getContent,
   ) where
 
 import Data.List (intercalate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad (when)
+import Data.Maybe (isNothing, fromMaybe)
 import Distribution.ModuleName (ModuleName, components, toFilePath)
 import qualified Distribution.Helper as H (mkQueryEnv, runQuery, 
                                            ghcOptions, components, 
@@ -25,41 +27,44 @@ import GHC (runGhc, getSessionDynFlags,
             moduleUnitId, dm_core_module,
             moduleNameString, moduleName,
             dm_typechecked_module, tm_typechecked_source,
-            parseDynamicFlags, noLoc, TypecheckedSource)
+            parseDynamicFlags, noLoc, TypecheckedSource,
+            ModSummary, Ghc, unLoc, ms_textual_imps)
 import GHC.Paths (libdir)
 import Module (UnitId(..))
 import HscTypes (ModGuts(..))
 import Avail (AvailInfo(..))
 import Name (getOccString)
+import Safe (headMay)
 import System.FilePath((</>))
 
-
 getDesugaredMod :: (MonadIO m) => FilePath -> ModuleName -> m DesugaredModule 
-getDesugaredMod pfp mn = 
-  liftIO . runGhc (Just libdir) $ do
-    dflags0 <- getSessionDynFlags
-    dflags1 <- getCabalDynFlagsLib pfp
-    (dflags, _, _) <- parseDynamicFlags dflags0 (noLoc <$> dflags1)
-    _ <- setSessionDynFlags dflags
-    target <- guessTarget fileName Nothing
-    setTargets [target]
-    _ <- load LoadAllTargets
-    modSum <- getModSummary $ mkModuleName modName
-    parseModule modSum >>= typecheckModule >>= desugarModule
-  where
-    modName = intercalate "." $ components mn 
-    fileName = "./" <> toFilePath mn 
+getDesugaredMod pfp mn = do
+    dflagsCM <- getCabalDynFlagsLib pfp
+    -- TODO: Setup better logging
+    when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
+    let dflagsC = fromMaybe [] dflagsCM 
+    liftIO . runGhc (Just libdir) $ do
+        modSum <- getModSum dflagsC mn
+        parseModule modSum >>= typecheckModule >>= desugarModule
 
--- TODO: API-Rework: how to err if we have no lib?
-getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m [String] 
+getModImports :: (MonadIO m) => FilePath -> ModuleName -> m [String]
+getModImports pfp mn = do
+    dflagsCM <- getCabalDynFlagsLib pfp
+    -- TODO: Setup better logging
+    when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
+    let dflagsC = fromMaybe [] dflagsCM 
+    liftIO . runGhc (Just libdir) $ do
+        modSum <- getModSum dflagsC mn
+        pure $ moduleNameString . unLoc . snd <$> ms_textual_imps modSum
+
+getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do
-  let qe = H.mkQueryEnv fp (fp </> "dist")
-  cs <- H.runQuery qe $ H.components $ (,) <$> H.ghcOptions
-  --TODO: rewrite /w error handling.
-  pure . fst . head $ filter getLib cs
-    where
-      getLib (_,H.ChLibName) = True
-      getLib _ = False
+    let qe = H.mkQueryEnv fp (fp </> "dist")
+    cs <- H.runQuery qe $ H.components $ (,) <$> H.ghcOptions
+    pure $ fst <$> headMay (filter getLib cs)
+  where
+    getLib (_,H.ChLibName) = True
+    getLib _ = False
 
 getModUnitId :: DesugaredModule -> UnitId
 getModUnitId = moduleUnitId . mg_module . dm_core_module
@@ -76,3 +81,26 @@ getContent = tm_typechecked_source . dm_typechecked_module
 getAvName :: AvailInfo -> String
 getAvName (Avail n) = getOccString n
 getAvName (AvailTC n _ _) = getOccString n
+
+onModSum :: (MonadIO m) => FilePath -> ModuleName -> (ModSummary -> Ghc a) -> m a
+onModSum pfp mn f = do 
+    dflagsCM <- getCabalDynFlagsLib pfp
+    -- TODO: Setup better logging
+    when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
+    let dflagsC = fromMaybe [] dflagsCM 
+    liftIO . runGhc (Just libdir) $ do
+        modSum <- getModSum dflagsC mn
+        f modSum
+
+getModSum :: [String] -> ModuleName -> Ghc ModSummary
+getModSum dflagsC mn = do
+    dflagsS <- getSessionDynFlags
+    (dflags, _, _) <- parseDynamicFlags dflagsS (noLoc <$> dflagsC)
+    _ <- setSessionDynFlags dflags
+    target <- guessTarget fileName Nothing
+    setTargets [target]
+    _ <- load LoadAllTargets
+    getModSummary $ mkModuleName modName
+  where
+    modName = intercalate "." $ components mn 
+    fileName = "./" <> toFilePath mn 

@@ -5,6 +5,7 @@ module ExHack.Types (
   PackageDlDesc(..),
   TarballDesc(..),
   ModuleName(..),
+  SymbolName(..),
   mkPackageName,
   mkVersion,
   getName,
@@ -42,6 +43,8 @@ newtype PackageDlDesc = PackageDlDesc (Text,Text,Text,Text)
 --   * The cabal file of this package.
 --
 newtype TarballDesc = TarballDesc (FilePath, Text)
+
+newtype SymbolName = SymbolName Text
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _, _)) = n

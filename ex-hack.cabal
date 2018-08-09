@@ -43,6 +43,7 @@ library
       tar,
       text,
       yaml,
+      safe,
       selda,
       selda-sqlite,
       zlib
