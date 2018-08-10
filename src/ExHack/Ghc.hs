@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module ExHack.Ghc (
   UnitId(..),
   TypecheckedSource,
@@ -7,6 +8,7 @@ module ExHack.Ghc (
   getModName,
   getModExports,
   getModImports,
+  getModSymbols,
   getContent,
   ) where
 
@@ -18,6 +20,9 @@ import Distribution.ModuleName (ModuleName, components, toFilePath)
 import qualified Distribution.Helper as H (mkQueryEnv, runQuery, 
                                            ghcOptions, components, 
                                            ChComponentName(ChLibName))
+import Safe (headMay)
+import System.FilePath((</>))
+-- GHC modules
 import GHC (runGhc, getSessionDynFlags,
             setSessionDynFlags, guessTarget,
             setTargets, load, LoadHowMuch(..),
@@ -28,14 +33,16 @@ import GHC (runGhc, getSessionDynFlags,
             moduleNameString, moduleName,
             dm_typechecked_module, tm_typechecked_source,
             parseDynamicFlags, noLoc, TypecheckedSource,
-            ModSummary, Ghc, unLoc, ms_textual_imps)
+            ModSummary, Ghc, unLoc, ms_textual_imps, 
+            GenLocated(..), findModule, getTokenStream,
+            SrcSpan)
 import GHC.Paths (libdir)
+import FastString (unpackFS)
 import Module (UnitId(..))
 import HscTypes (ModGuts(..))
 import Avail (AvailInfo(..))
 import Name (getOccString)
-import Safe (headMay)
-import System.FilePath((</>))
+import Lexer (Token(ITqvarid, ITvarid))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp mn = 
@@ -46,6 +53,22 @@ getModImports :: (MonadIO m) => FilePath -> ModuleName -> m [String]
 getModImports pfp mn = 
     onModSum pfp mn (\modSum ->
         pure $ moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
+
+getModSymbols :: (MonadIO m) => FilePath -> ModuleName -> m [GenLocated SrcSpan String] 
+getModSymbols pfp mn =
+    withGhcEnv pfp mn $ do
+        m <- findModule (mkModuleName modName) Nothing 
+        ts <- getTokenStream m
+        pure $ (unpackFS . getTNames) <$$> filter filterTokenTypes ts
+        where
+            modName = intercalate "." $ components mn
+            filterTokenTypes (L _ (ITqvarid _)) = True   
+            filterTokenTypes (L _ (ITvarid _)) = True   
+            filterTokenTypes _ = False
+            getTNames (ITqvarid (_,n)) = n
+            getTNames (ITvarid n) = n
+            getTNames _ = error "The impossible happened."
+            (<$$>) = fmap . fmap
 
 getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do
@@ -72,8 +95,8 @@ getAvName :: AvailInfo -> String
 getAvName (Avail n) = getOccString n
 getAvName (AvailTC n _ _) = getOccString n
 
-onModSum :: (MonadIO m) => FilePath -> ModuleName -> (ModSummary -> Ghc a) -> m a
-onModSum pfp mn f = do 
+withGhcEnv :: (MonadIO m) => FilePath -> ModuleName -> Ghc a -> m a
+withGhcEnv pfp mn a = do 
     dflagsCM <- getCabalDynFlagsLib pfp
     -- TODO: Setup better logging
     when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
@@ -85,8 +108,12 @@ onModSum pfp mn f = do
         target <- guessTarget fileName Nothing
         setTargets [target]
         _ <- load LoadAllTargets
-        modSum <- getModSummary $ mkModuleName modName
-        f modSum
+        a
   where
-    modName = intercalate "." $ components mn 
-    fileName = "./" <> toFilePath mn 
+    fileName = "./" <> toFilePath mn
+
+onModSum :: (MonadIO m) => FilePath -> ModuleName -> (ModSummary -> Ghc a) -> m a
+onModSum pfp mn f = withGhcEnv pfp mn 
+                        (getModSummary (mkModuleName modName) >>= f)
+    where
+        modName = intercalate "." $ components mn 
