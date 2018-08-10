@@ -38,24 +38,14 @@ import Safe (headMay)
 import System.FilePath((</>))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ModuleName -> m DesugaredModule 
-getDesugaredMod pfp mn = do
-    dflagsCM <- getCabalDynFlagsLib pfp
-    -- TODO: Setup better logging
-    when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
-    let dflagsC = fromMaybe [] dflagsCM 
-    liftIO . runGhc (Just libdir) $ do
-        modSum <- getModSum dflagsC mn
-        parseModule modSum >>= typecheckModule >>= desugarModule
+getDesugaredMod pfp mn = 
+    onModSum pfp mn (\modSum -> 
+        parseModule modSum >>= typecheckModule >>= desugarModule)
 
 getModImports :: (MonadIO m) => FilePath -> ModuleName -> m [String]
-getModImports pfp mn = do
-    dflagsCM <- getCabalDynFlagsLib pfp
-    -- TODO: Setup better logging
-    when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
-    let dflagsC = fromMaybe [] dflagsCM 
-    liftIO . runGhc (Just libdir) $ do
-        modSum <- getModSum dflagsC mn
-        pure $ moduleNameString . unLoc . snd <$> ms_textual_imps modSum
+getModImports pfp mn = 
+    onModSum pfp mn (\modSum ->
+        pure $ moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
 getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do
@@ -89,18 +79,14 @@ onModSum pfp mn f = do
     when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
     let dflagsC = fromMaybe [] dflagsCM 
     liftIO . runGhc (Just libdir) $ do
-        modSum <- getModSum dflagsC mn
+        dflagsS <- getSessionDynFlags
+        (dflags, _, _) <- parseDynamicFlags dflagsS (noLoc <$> dflagsC)
+        _ <- setSessionDynFlags dflags
+        target <- guessTarget fileName Nothing
+        setTargets [target]
+        _ <- load LoadAllTargets
+        modSum <- getModSummary $ mkModuleName modName
         f modSum
-
-getModSum :: [String] -> ModuleName -> Ghc ModSummary
-getModSum dflagsC mn = do
-    dflagsS <- getSessionDynFlags
-    (dflags, _, _) <- parseDynamicFlags dflagsS (noLoc <$> dflagsC)
-    _ <- setSessionDynFlags dflags
-    target <- guessTarget fileName Nothing
-    setTargets [target]
-    _ <- load LoadAllTargets
-    getModSummary $ mkModuleName modName
   where
     modName = intercalate "." $ components mn 
     fileName = "./" <> toFilePath mn 
