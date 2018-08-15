@@ -1,19 +1,38 @@
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module ExHack.Types (
-  Package(..),
-  PackageIdentifier(..),
-  PackageName,
-  PackageDlDesc(..),
-  TarballDesc(..),
-  ModuleName(..),
-  SymbolName(..),
-  mkPackageName,
-  mkVersion,
-  getName,
-  depsNames,
-  packagedlDescName,
-  fromComponents
+    Config(..),
+    Package(..),
+    PackageIdentifier(..),
+    PackageName,
+    PackageDlDesc(..),
+    TarballDesc(..),
+    ModuleName(..),
+    SymbolName(..),
+    DatabaseHandle,
+    DatabaseStatus(..),
+    MonadStep,
+    Step,
+    runStep,
+    mkPackageName,
+    mkVersion,
+    getName,
+    depsNames,
+    packagedlDescName,
+    fromComponents
 ) where
 
+import Control.Lens.TH (makeLenses)
+import Control.Monad.Catch (MonadMask)
+import Control.Monad.Reader (ReaderT, MonadReader, 
+                             runReaderT)
+import Control.Monad.IO.Class (MonadIO)
 import Data.Set (Set, toList)
 import Data.Text (Text, pack)
 import Distribution.ModuleName (ModuleName(..), fromComponents)
@@ -22,6 +41,9 @@ import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName
 import Distribution.Version (mkVersion)
 import System.FilePath (FilePath)
 
+import ExHack.Utils (Has(..))
+
+
 data Package = Package {
   name :: PackageIdentifier,
   deps :: Set PackageName,
@@ -29,6 +51,19 @@ data Package = Package {
   tarballPath :: FilePath,
   exposedModules :: Maybe [ModuleName]
 } deriving (Eq, Show)
+
+type DatabaseHandle (a :: DatabaseStatus) = FilePath
+
+data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
+
+data Config a = Config {
+    _dbHandle :: DatabaseHandle a
+}
+
+makeLenses ''Config
+
+instance Has (Config 'New) (DatabaseHandle 'New) where
+    hasLens = dbHandle
 
 -- | Intermediate package description used till we parse the data necessary
 --   to generate the proper package description.
@@ -45,6 +80,13 @@ newtype PackageDlDesc = PackageDlDesc (Text,Text,Text,Text)
 newtype TarballDesc = TarballDesc (FilePath, Text)
 
 newtype SymbolName = SymbolName Text
+
+type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m)
+
+type Step c a = ReaderT c IO a 
+
+runStep :: Step c a -> c -> IO a 
+runStep = runReaderT
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _, _)) = n

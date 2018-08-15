@@ -1,7 +1,6 @@
 module Cli (
   step,
-  promptUser,
-  PreCondition
+  promptUser
 ) where
 
 import Control.Monad (when)

@@ -1,19 +1,26 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
 
 module ExHack.Data.Db (
-  initDb,
-  savePackages,
-  savePackageDeps,
-  savePackageMods,
-  saveModuleSymbols
+    mkHandle,
+    initDb,
+    savePackages,
+    savePackageDeps,
+    savePackageMods,
+    saveModuleSymbols
 ) where
 
 import Data.Maybe                  (listToMaybe)
 import Data.Text                   (Text, pack)
 import Database.Selda    
+import Database.Selda.Backend      (MonadSelda(..))
 import qualified ExHack.Types as T (Package(..))
-import ExHack.Types                (ModuleName, SymbolName(..), getName, depsNames)
+import ExHack.Types                (ModuleName, DatabaseHandle, DatabaseStatus(..),
+                                    SymbolName(..), getName, depsNames)
+
+mkHandle :: FilePath -> DatabaseHandle 'New
+mkHandle = id
 
 packageId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text

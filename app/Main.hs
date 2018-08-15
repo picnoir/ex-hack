@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
+
 module Main where
 
 import Prelude hiding (readFile, writeFile)
@@ -17,40 +19,30 @@ import System.Directory (doesFileExist, removeFile, listDirectory)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Stackage.StackageParser
-import ExHack.Types (Package(..), PackageDlDesc(..),
-                     TarballDesc(..), packagedlDescName, packagedlDescName)
-import ExHack.Data.Db (initDb, savePackages,
+import ExHack.Types (Package(..), PackageDlDesc(..), DatabaseStatus(..),
+                     TarballDesc(..), Config(..), packagedlDescName, packagedlDescName, runStep)
+import ExHack.Data.Db (mkHandle, savePackages,
                        savePackageDeps)
+import ProcessingSteps (generateDb)
 
-import Config (cabalFilesDir, tarballsDir, dbFilePath,
-               hoogleFilesDir)
-import Cli (step, promptUser, PreCondition)
+import Config (cabalFilesDir, tarballsDir,
+               hoogleFilesDir, dbFilePath)
+import Cli (step, promptUser)
 import Log (logProgress, logTitle)
+
+type PreCondition = IO Bool
 
 main :: IO ()
 main = do
-  step "[+] STEP 0: Creating DB" isDb sGenerateDb 
-  logTitle "[+] STEP 1: Parsing stackage LTS-10.5"
-  stackageYaml <- readFile "./data/lts-10.5.yaml"  
-  let packages = fromJust $ parseStackageYaml stackageYaml
-      hackageUrl = getHackageUrls packages
-  logTitle "[+] STEP 2: bootstrapping GHC"
-  step "[+] STEP 3: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles $ sDlHack hackageUrl
-  step "[+] STEP 4: Generating dependancy graph" (return True) (sGenDepGraph hackageUrl)
-
-sGenerateDb :: IO ()
-sGenerateDb = withSQLite dbFilePath initDb
-
-isDb :: PreCondition
-isDb = do
-  f <- doesFileExist dbFilePath
-  if f
-    then do
-      del <- promptUser "A database has already been generated, delete it?"
-      if del
-        then putStrLn "Deleting..." >> removeFile dbFilePath >> return True
-        else return False
-    else return True
+    let dbHandle = (Config $ mkHandle dbFilePath) :: Config 'New
+    runStep generateDb dbHandle
+    logTitle "[+] STEP 1: Parsing stackage LTS-10.5"
+    stackageYaml <- readFile "./data/lts-10.5.yaml"  
+    let packages = fromJust $ parseStackageYaml stackageYaml
+        hackageUrl = getHackageUrls packages
+    logTitle "[+] STEP 2: bootstrapping GHC"
+    step "[+] STEP 3: Downloading hackage files (cabal builds + tarballs)" shouldDlCabalFiles $ sDlHack hackageUrl
+    step "[+] STEP 4: Generating dependancy graph" (return True) (sGenDepGraph hackageUrl)
 
 sDlHack :: [ PackageDlDesc ] -> IO ()
 sDlHack packages = do

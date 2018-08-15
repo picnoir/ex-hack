@@ -5,8 +5,8 @@ module Log (
 
 
 logProgress :: String -> String -> IO ()
-logProgress prefix l = putStrLn (prefix ++ l)
+logProgress prefix l = putStrLn (prefix <> l)
 
 logTitle :: String -> IO ()
-logTitle txt = line >> putStrLn ("* " ++ txt ++ " *") >> line
+logTitle txt = line >> putStrLn ("* " <> txt <> " *") >> line
   where line = putStrLn (replicate (length txt + 4) '*')
