@@ -23,8 +23,7 @@ getHackageUrls :: Packages -> [PackageDlDesc]
 getHackageUrls (Packages m) = foldlWithKey getCabal [] m
   where getCabal xs k e = PackageDlDesc(packName,
                            mconcat [base,packName,".cabal"],
-                           mconcat [base,packName, "-",ppVersion e, ".tar.gz"],
-                           mconcat [base, "docs/", packName, ".txt"]) : xs
+                           mconcat [base,packName, "-",ppVersion e, ".tar.gz"]) : xs
           where
             !packName = T.pack $ C.unPackageName k
             !base = mconcat ["https://hackage.haskell.org/package/", 
