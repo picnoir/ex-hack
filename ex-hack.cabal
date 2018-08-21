@@ -54,7 +54,6 @@ library
       ExHack.Config,
       ExHack.Ghc,
       ExHack.Hackage.Hackage,
-      ExHack.Stackage.Stack,
       ExHack.Stackage.StackageTypes,
       ExHack.Stackage.StackageParser,
       ExHack.Cabal.Cabal,
@@ -69,7 +68,7 @@ executable ex-hack
   main-is: Main.hs
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >= 4.11 && <5
     , bytestring
@@ -84,7 +83,6 @@ executable ex-hack
     , selda-sqlite
   other-modules:
     Cli,
-    Config,
     Log,
     ProcessingSteps
   default-language: Haskell2010

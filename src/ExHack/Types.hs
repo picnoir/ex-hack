@@ -18,8 +18,8 @@ module ExHack.Types (
     DatabaseHandle,
     DatabaseStatus(..),
     StackageFile(..),
-    TarballsDir,
-    CabalFilesDir,
+    TarballsDir(..),
+    CabalFilesDir(..),
     MonadStep,
     Step,
     tarballsDir,
@@ -59,8 +59,8 @@ data Package = Package {
 
 type DatabaseHandle (a :: DatabaseStatus) = FilePath
 
-type TarballsDir = FilePath
-type CabalFilesDir = FilePath
+newtype TarballsDir = TarballsDir FilePath
+newtype CabalFilesDir = CabalFilesDir FilePath
 
 data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
 
@@ -78,8 +78,17 @@ makeLenses ''Config
 instance Has (Config 'New) (DatabaseHandle 'New) where
     hasLens = dbHandle
 
+instance Has (Config 'Initialized) (DatabaseHandle 'Initialized) where
+    hasLens = dbHandle
+
 instance Has (Config a) StackageFile where
     hasLens = stackageFile
+
+instance Has (Config a) TarballsDir where
+    hasLens = tarballsDir
+
+instance Has (Config a) CabalFilesDir where
+    hasLens = cabalFilesDir
 
 -- | Intermediate package description used till we parse the data necessary
 --   to generate the proper package description.

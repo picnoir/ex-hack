@@ -28,7 +28,7 @@ import ExHack.Stackage.StackageParser (getHackageUrls,
 import ExHack.Types (MonadStep, DatabaseHandle,
                      DatabaseStatus(..), PackageDlDesc,
                      StackageFile, StackageFile(..),
-                     TarballsDir, CabalFilesDir, PackageDlDesc(..),
+                     TarballsDir(..), CabalFilesDir(..), PackageDlDesc(..),
                      TarballDesc(..), Package, packagedlDescName)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
@@ -79,12 +79,15 @@ dlAssets packages = do
         liftIO $ logProgress "----" ("[" <> show step' <> "/" <> show totalSteps <> "] " <> T.unpack pn)
         return $ step' + 1
     downloadHackageFiles :: CabalFilesDir -> TarballsDir -> Manager -> PackageDlDesc -> m ()
-    downloadHackageFiles cabalFilesDir tarballsDir m (PackageDlDesc (name, cabalUrl, tarballUrl)) = liftIO $ do
-        f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) m 
-        BS.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
-        f' <-  httpLbs (parseRequest_ $ T.unpack tarballUrl) m
-        BS.writeFile (tarballsDir <> T.unpack name <> ".tar.gz") $ responseBody f' 
-        return ()
+    downloadHackageFiles 
+      (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) man 
+      (PackageDlDesc (name, cabalUrl, tarballUrl)) = 
+        liftIO $ do
+            f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) man 
+            BS.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
+            f' <-  httpLbs (parseRequest_ $ T.unpack tarballUrl) man
+            BS.writeFile (tarballsDir <> T.unpack name <> ".tar.gz") $ responseBody f' 
+            return ()
 
 genGraphDep :: forall c m.
     (Has c TarballsDir,
@@ -116,7 +119,7 @@ genGraphDep pd = do
         return ()
   where
     readPkgsFiles :: CabalFilesDir -> TarballsDir -> PackageDlDesc -> m TarballDesc
-    readPkgsFiles !cabalFilesDir !tarballsDir p = do
+    readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) p = do
         let tp = tarballsDir <> T.unpack (packagedlDescName p) <> ".tar.gz"
         cf <- liftIO $ T.readFile $ cabalFilesDir <> T.unpack (packagedlDescName p) <> ".cabal"
         pure $ TarballDesc (tp,cf)
