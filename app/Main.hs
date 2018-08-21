@@ -8,7 +8,8 @@ import Data.Text.IO (readFile)
 
 
 import ExHack.Types (DatabaseStatus(..), Config(..), StackageFile(..), 
-                     TarballsDir(..), CabalFilesDir(..), runStep)
+                     TarballsDir(..), CabalFilesDir(..),
+                     WorkDir(..), runStep)
 import ExHack.Data.Db (mkHandle)
 
 import ProcessingSteps (generateDb, parseStackage,
@@ -24,6 +25,7 @@ initConf = do
     pure $ Config (mkHandle "./data/data.db") (StackageFile stackageYaml) 
                   (TarballsDir "/home/minoulefou/exhst/tb/") 
                   (CabalFilesDir "/home/minoulefou/exhst/cabal")
+                  (WorkDir "/home/minoulefou/exhst/wd")
 
 main :: IO ()
 main = do
@@ -36,4 +38,5 @@ main = do
     logTitle "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)"
     runStep (dlAssets descs) ci 
     logTitle "[+] STEP 3: Generating dependancy graph"
-    runStep (genGraphDep descs) ci
+    pgks <- runStep (genGraphDep descs) ci
+    pure ()

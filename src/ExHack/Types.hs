@@ -20,10 +20,13 @@ module ExHack.Types (
     StackageFile(..),
     TarballsDir(..),
     CabalFilesDir(..),
+    WorkDir(..),
+    PackageExports(..),
     MonadStep,
     Step,
     tarballsDir,
     cabalFilesDir,
+    workDir,
     runStep,
     mkPackageName,
     mkVersion,
@@ -61,6 +64,7 @@ type DatabaseHandle (a :: DatabaseStatus) = FilePath
 
 newtype TarballsDir = TarballsDir FilePath
 newtype CabalFilesDir = CabalFilesDir FilePath
+newtype WorkDir = WorkDir FilePath
 
 data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
 
@@ -70,7 +74,8 @@ data Config a = Config {
     _dbHandle :: DatabaseHandle a,
     _stackageFile :: StackageFile,
     _tarballsDir :: TarballsDir,
-    _cabalFilesDir :: CabalFilesDir
+    _cabalFilesDir :: CabalFilesDir,
+    _workDir :: WorkDir
 }
 
 makeLenses ''Config
@@ -89,6 +94,9 @@ instance Has (Config a) TarballsDir where
 
 instance Has (Config a) CabalFilesDir where
     hasLens = cabalFilesDir
+
+instance Has (Config a) WorkDir where
+    hasLens = workDir
 
 -- | Intermediate package description used till we parse the data necessary
 --   to generate the proper package description.
@@ -110,6 +118,9 @@ newtype SymbolName = SymbolName Text
 type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m)
 
 type Step c a = ReaderT c IO a
+
+newtype PackageExports = PackageExports [(ModuleName, [String])]
+  deriving (Show, Eq)
 
 runStep :: Step c a -> c -> IO a
 runStep = runReaderT

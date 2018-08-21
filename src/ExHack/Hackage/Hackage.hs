@@ -20,10 +20,8 @@ import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
-import ExHack.Types (Package(exposedModules), TarballDesc(..))
+import ExHack.Types (Package(exposedModules), TarballDesc(..), PackageExports(..))
 
-newtype PackageExports = PackageExports [(ModuleName, [String])]
-  deriving (Show, Eq)
 
 
 -- | Unpack a tarball to a specified directory.

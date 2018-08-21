@@ -51,7 +51,6 @@ library
       selda-sqlite,
       zlib
   exposed-modules:
-      ExHack.Config,
       ExHack.Ghc,
       ExHack.Hackage.Hackage,
       ExHack.Stackage.StackageTypes,

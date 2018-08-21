@@ -8,10 +8,12 @@ module ProcessingSteps (
     generateDb,
     parseStackage,
     dlAssets,
-    genGraphDep
+    genGraphDep,
+    retrievePkgsExports
 ) where
 
-import qualified Data.ByteString.Lazy as BS (writeFile)
+import qualified Data.ByteString.Lazy as BL (writeFile)
+import qualified Data.ByteString as BS (readFile)
 import Data.Maybe (fromJust)
 import Control.Lens (view)
 import Control.Monad.IO.Class (liftIO)
@@ -23,13 +25,16 @@ import Database.Selda.SQLite (withSQLite)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Utils (Has(..))
+import ExHack.Hackage.Hackage (unpackHackageTarball, getPackageExports)
 import ExHack.Stackage.StackageParser (getHackageUrls,
                                        parseStackageYaml)
 import ExHack.Types (MonadStep, DatabaseHandle,
                      DatabaseStatus(..), PackageDlDesc,
                      StackageFile, StackageFile(..),
                      TarballsDir(..), CabalFilesDir(..), PackageDlDesc(..),
-                     TarballDesc(..), Package, packagedlDescName)
+                     TarballDesc(..), Package(tarballPath),
+                     PackageExports(..), WorkDir(..),
+                     packagedlDescName)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
                             newManager, Manager, httpLbs,
@@ -84,9 +89,9 @@ dlAssets packages = do
       (PackageDlDesc (name, cabalUrl, tarballUrl)) = 
         liftIO $ do
             f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) man 
-            BS.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
+            BL.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
             f' <-  httpLbs (parseRequest_ $ T.unpack tarballUrl) man
-            BS.writeFile (tarballsDir <> T.unpack name <> ".tar.gz") $ responseBody f' 
+            BL.writeFile (tarballsDir <> T.unpack name <> ".tar.gz") $ responseBody f' 
             return ()
 
 genGraphDep :: forall c m.
@@ -94,7 +99,7 @@ genGraphDep :: forall c m.
      Has c CabalFilesDir,
      Has c (DatabaseHandle 'Initialized),
      MonadStep c m)
-    => [PackageDlDesc] -> m ()
+    => [PackageDlDesc] -> m [Package]
 genGraphDep pd = do
     -- 1. Parse cabal files
     -- 2. Insert Packages
@@ -117,6 +122,7 @@ genGraphDep pd = do
         _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs'
         liftIO $ putStrLn "[+] Done."
         return ()
+    pure pkgs'
   where
     readPkgsFiles :: CabalFilesDir -> TarballsDir -> PackageDlDesc -> m TarballDesc
     readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) p = do
@@ -129,3 +135,18 @@ genGraphDep pd = do
       savePackageDeps pkg
       liftIO $ logProgress "----" ("["++ show step' ++ "/" ++ show totalDeps ++ "] " ++ show pkg)
       return $ step' + 1
+
+retrievePkgsExports :: forall c m.
+    (Has c WorkDir,
+     MonadStep c m)
+      => [Package] -> m [PackageExports]
+retrievePkgsExports pkgs = do
+    wd <- asks (view hasLens) 
+    getPkgExports wd `mapM` pkgs
+  where
+    -- TODO think about error handling here.
+    getPkgExports :: WorkDir -> Package -> m PackageExports
+    getPkgExports (WorkDir wd) p = do
+        tb <- liftIO . BS.readFile $ tarballPath p
+        tbp <- unpackHackageTarball wd tb  
+        getPackageExports tbp p
