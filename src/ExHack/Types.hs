@@ -10,6 +10,7 @@
 
 module ExHack.Types (
     Config(..),
+    PackageComponent(..),
     Package(..),
     PackageIdentifier(..),
     PackageName,
@@ -56,14 +57,19 @@ import System.FilePath (FilePath)
 
 import ExHack.Utils (Has(..))
 
+data PackageComponent = PackageComponent {
+    mods :: [ModuleName],
+    root :: [FilePath]
+} deriving (Eq, Show)
 
 data Package = Package {
   name :: PackageIdentifier,
   deps :: Set PackageName,
   cabalFile :: Text,
   tarballPath :: FilePath,
-  exposedModules :: Maybe [ModuleName],
-  dbId :: Maybe RowID
+  exposedModules :: Maybe PackageComponent,
+  dbId :: Maybe RowID,
+  allModules :: [ModuleName]
 } deriving (Eq, Show)
 
 type DatabaseHandle (a :: DatabaseStatus) = FilePath

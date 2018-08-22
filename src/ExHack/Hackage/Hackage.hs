@@ -20,7 +20,8 @@ import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
-import ExHack.Types (Package(exposedModules), TarballDesc(..), PackageExports(..))
+import ExHack.Types (PackageComponent(..), Package(exposedModules), 
+                     TarballDesc(..), PackageExports(..))
 
 
 
@@ -66,7 +67,7 @@ getPackageExports pfp p = do
       getExports (mn, dm) = (mn, getModExports dm) 
 
 loadExposedModules :: (MonadIO m) => FilePath -> Package -> m [(ModuleName, DesugaredModule)] 
-loadExposedModules pfp p = (loadModule pfp) `mapM` fromMaybe mempty (exposedModules p)
+loadExposedModules pfp p = (loadModule pfp) `mapM` fromMaybe mempty (mods <$> exposedModules p)
 
 loadModule :: (MonadIO m) => FilePath -> ModuleName -> m (ModuleName, DesugaredModule)
 loadModule pfp mn = getDesugaredMod pfp mn >>= \m -> pure (mn,m)

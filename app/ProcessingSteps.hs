@@ -9,7 +9,8 @@ module ProcessingSteps (
     parseStackage,
     dlAssets,
     genGraphDep,
-    retrievePkgsExports
+    retrievePkgsExports,
+    indexSymbols
 ) where
 
 import qualified Data.ByteString.Lazy as BL (writeFile)
@@ -43,6 +44,8 @@ import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 import Log (logProgress)
+
+-- general TODO: properly catch database exceptions
 
 generateDb :: forall c m. 
     (Has c (DatabaseHandle 'New), 
@@ -102,11 +105,6 @@ genGraphDep :: forall c m.
      MonadStep c m)
     => [PackageDlDesc] -> m (DatabaseHandle 'DepsGraph, [Package])
 genGraphDep pd = do
-    -- 1. Parse cabal files
-    -- 2. Insert Packages
-    -- 3. Insert Deps
-    --
-    -- 1
     dbHandle <- asks (view hasLens)
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
@@ -156,3 +154,16 @@ retrievePkgsExports pkgs = do
         tb <- liftIO . BS.readFile $ tarballPath p
         tbp <- unpackHackageTarball wd tb  
         getPackageExports tbp p
+
+indexSymbols :: forall c m.
+    (MonadStep c m,
+     Has c (DatabaseHandle 'DepsGraph))
+  => [PackageExports] -> m ()
+indexSymbols = undefined
+-- 1. Get all project's files
+-- 2. Get a project deps
+-- 3. For each file
+--    a. See what's imported
+--    b. Create a "scope"
+--    c. Get the symbols
+--    d. Filter the symbols.
