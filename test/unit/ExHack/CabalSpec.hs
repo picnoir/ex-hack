@@ -20,7 +20,7 @@ spec = describe "parseCabalFile" $
               res = parseCabalFile $ TarballDesc ("", cf)
             case runParseResult res of
                 (_, Left err) -> fail $ show err
-                (_, Right r) -> r `shouldBe` Package (PackageIdentifier "ad" $ mkVersion [4, 3, 5]) (fromList ["array", "base", "comonad", "containers", "data-reify", "erf", "free", "nats", "reflection", "semigroups", "transformers", "directory", "doctest", "filepath", "criterion"]) cf "" exposedMods
+                (_, Right r) -> r `shouldBe` Package (PackageIdentifier "ad" $ mkVersion [4, 3, 5]) (fromList ["array", "base", "comonad", "containers", "data-reify", "erf", "free", "nats", "reflection", "semigroups", "transformers", "directory", "doctest", "filepath", "criterion"]) cf "" exposedMods Nothing
 
 
 exposedMods :: Maybe [ModuleName]

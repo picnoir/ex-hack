@@ -35,7 +35,8 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      TarballDesc(..), Package(tarballPath),
                      PackageExports(..), WorkDir(..),
                      packagedlDescName)
-import ExHack.Data.Db (initDb, savePackages, savePackageDeps)
+import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
+                       savePackageMods)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
                             newManager, Manager, httpLbs,
                             parseRequest_, responseBody)
@@ -99,7 +100,7 @@ genGraphDep :: forall c m.
      Has c CabalFilesDir,
      Has c (DatabaseHandle 'Initialized),
      MonadStep c m)
-    => [PackageDlDesc] -> m [Package]
+    => [PackageDlDesc] -> m (DatabaseHandle 'DepsGraph, [Package])
 genGraphDep pd = do
     -- 1. Parse cabal files
     -- 2. Insert Packages
@@ -122,7 +123,7 @@ genGraphDep pd = do
         _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs'
         liftIO $ putStrLn "[+] Done."
         return ()
-    pure pkgs'
+    pure (dbHandle, pkgs')
   where
     readPkgsFiles :: CabalFilesDir -> TarballsDir -> PackageDlDesc -> m TarballDesc
     readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) p = do
@@ -138,11 +139,16 @@ genGraphDep pd = do
 
 retrievePkgsExports :: forall c m.
     (Has c WorkDir,
+     Has c (DatabaseHandle 'DepsGraph),
      MonadStep c m)
-      => [Package] -> m [PackageExports]
+   => [Package] -> m (DatabaseHandle 'PkgExports, [PackageExports])
 retrievePkgsExports pkgs = do
+    dbHandle <- asks (view hasLens)
     wd <- asks (view hasLens) 
-    getPkgExports wd `mapM` pkgs
+    pkgsExports <- getPkgExports wd `mapM` pkgs
+    let seldaActions = savePackageMods <$> pkgsExports
+    _ <- liftIO $ withSQLite dbHandle $ sequence seldaActions
+    pure (dbHandle, pkgsExports)
   where
     -- TODO think about error handling here.
     getPkgExports :: WorkDir -> Package -> m PackageExports

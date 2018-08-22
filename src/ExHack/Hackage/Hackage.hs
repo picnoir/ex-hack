@@ -61,7 +61,7 @@ getTarballDesc fp = do
 getPackageExports :: (MonadIO m) => FilePath -> Package -> m PackageExports
 getPackageExports pfp p = do
   em <- liftIO $ withCurrentDirectory pfp (loadExposedModules pfp p)
-  pure $ PackageExports $ getExports <$> em
+  pure $ PackageExports (p, getExports <$> em)
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 

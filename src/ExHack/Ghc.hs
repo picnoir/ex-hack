@@ -16,6 +16,7 @@ import Data.List (intercalate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (when)
 import Data.Maybe (isNothing, fromMaybe)
+import Data.Text (pack)
 import Distribution.ModuleName (ModuleName, components, toFilePath)
 import qualified Distribution.Helper as H (mkQueryEnv, runQuery, 
                                            ghcOptions, components, 
@@ -43,6 +44,8 @@ import HscTypes (ModGuts(..))
 import Avail (AvailInfo(..))
 import Name (getOccString)
 import Lexer (Token(ITqvarid, ITvarid))
+
+import ExHack.Types (SymbolName(..))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp mn = 
@@ -85,15 +88,15 @@ getModUnitId = moduleUnitId . mg_module . dm_core_module
 getModName :: DesugaredModule -> String
 getModName = moduleNameString . moduleName . mg_module . dm_core_module
 
-getModExports :: DesugaredModule -> [String]
+getModExports :: DesugaredModule -> [SymbolName]
 getModExports = fmap getAvName . mg_exports . dm_core_module
 
 getContent :: DesugaredModule -> TypecheckedSource
 getContent = tm_typechecked_source . dm_typechecked_module
 
-getAvName :: AvailInfo -> String
-getAvName (Avail n) = getOccString n
-getAvName (AvailTC n _ _) = getOccString n
+getAvName :: AvailInfo -> SymbolName
+getAvName (Avail n) = SymbolName $ pack $ getOccString n
+getAvName (AvailTC n _ _) = SymbolName $ pack $ getOccString n
 
 withGhcEnv :: (MonadIO m) => FilePath -> ModuleName -> Ghc a -> m a
 withGhcEnv pfp mn a = do 

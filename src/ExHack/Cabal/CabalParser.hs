@@ -29,36 +29,37 @@ getSuccParse = foldr appendParseResult []
                                     (_, Right x) -> x:xs
 
 parseCabalFile :: TarballDesc -> ParseResult Package
-parseCabalFile (TarballDesc (tp, cf)) = Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> expMods 
-    where
-      gpackageDesc = parseGenericPackageDescription $ encodeUtf8 cf
-      packN = package .  packageDescription <$> gpackageDesc
---    We want deps for both the app and the potential libs.
---    The following code is messy as hell but necessary. Deps are quite heavily burried
---    in Cabal's packages data structures...
+parseCabalFile (TarballDesc (tp, cf)) = 
+    Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> expMods <*> pure Nothing
+  where
+    gpackageDesc = parseGenericPackageDescription $ encodeUtf8 cf
+    packN = package .  packageDescription <$> gpackageDesc
+--  We want deps for both the app and the potential libs.
+--  The following code is messy as hell but necessary. Deps are quite heavily burried
+--  in Cabal's packages data structures...
 --
---    I made types explicits to document a bit this black magic.
-      expMods :: ParseResult (Maybe [ModuleName])
-      expMods = (Lib.exposedModules . condTreeData) <$$> condLibrary <$> gpackageDesc
-      packDeps :: ParseResult (Set PackageName)
-      packDeps = fromList <$> (fmap . fmap) depPkgName allDeps
---    The package should not be a dependancy to itself.
-      filteredPackDep = do
-        pd <- packDeps 
-        pn <- pkgName <$> packN
-        return $ S.filter (/= pn) pd
-      allDeps :: ParseResult [Dependency]
-      allDeps = mainLibDep `prApp` subLibDep `prApp` execDep `prApp` testDep `prApp` benchDep
-      mainLibDep :: ParseResult [Dependency]
-      mainLibDep = treeToDep (maybeToList . condLibrary) <$> gpackageDesc
-      subLibDep = treeToDep $ getTree condSubLibraries
-      execDep = treeToDep $ getTree condExecutables
-      testDep = treeToDep $ getTree condTestSuites
-      benchDep = treeToDep $ getTree condBenchmarks
-      -- Helper functions
-      -- ================
-      getTree st = (fmap . fmap) snd (st <$> gpackageDesc)
-      treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
-      prApp :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
-      prApp a b = (++) <$> a <*> b
-      (<$$>) = fmap . fmap
+--  I made types explicits to document a bit this black magic.
+    expMods :: ParseResult (Maybe [ModuleName])
+    expMods = (Lib.exposedModules . condTreeData) <$$> condLibrary <$> gpackageDesc
+    packDeps :: ParseResult (Set PackageName)
+    packDeps = fromList <$> (fmap . fmap) depPkgName allDeps
+--  The package should not be a dependancy to itself.
+    filteredPackDep = do
+      pd <- packDeps 
+      pn <- pkgName <$> packN
+      return $ S.filter (/= pn) pd
+    allDeps :: ParseResult [Dependency]
+    allDeps = mainLibDep `prApp` subLibDep `prApp` execDep `prApp` testDep `prApp` benchDep
+    mainLibDep :: ParseResult [Dependency]
+    mainLibDep = treeToDep (maybeToList . condLibrary) <$> gpackageDesc
+    subLibDep = treeToDep $ getTree condSubLibraries
+    execDep = treeToDep $ getTree condExecutables
+    testDep = treeToDep $ getTree condTestSuites
+    benchDep = treeToDep $ getTree condBenchmarks
+    -- Helper functions
+    -- ================
+    getTree st = (fmap . fmap) snd (st <$> gpackageDesc)
+    treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
+    prApp :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
+    prApp a b = (++) <$> a <*> b
+    (<$$>) = fmap . fmap

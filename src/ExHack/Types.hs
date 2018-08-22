@@ -5,6 +5,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module ExHack.Types (
     Config(..),
@@ -31,6 +33,7 @@ module ExHack.Types (
     mkPackageName,
     mkVersion,
     getName,
+    getModName,
     depsNames,
     packagedlDescName,
     fromComponents
@@ -42,8 +45,10 @@ import Control.Monad.Reader (ReaderT, MonadReader,
                              runReaderT)
 import Control.Monad.IO.Class (MonadIO)
 import Data.Set (Set, toList)
-import Data.Text (Text, pack)
-import Distribution.ModuleName (ModuleName(..), fromComponents)
+import Data.Text (Text, pack, intercalate)
+import Data.String (IsString)
+import Database.Selda (RowID)
+import Distribution.ModuleName (ModuleName(..), fromComponents, components)
 import Distribution.Types.PackageId (PackageIdentifier(..), pkgName)
 import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
 import Distribution.Version (mkVersion)
@@ -57,7 +62,8 @@ data Package = Package {
   deps :: Set PackageName,
   cabalFile :: Text,
   tarballPath :: FilePath,
-  exposedModules :: Maybe [ModuleName]
+  exposedModules :: Maybe [ModuleName],
+  dbId :: Maybe RowID
 } deriving (Eq, Show)
 
 type DatabaseHandle (a :: DatabaseStatus) = FilePath
@@ -114,12 +120,21 @@ newtype PackageDlDesc = PackageDlDesc (Text,Text,Text)
 newtype TarballDesc = TarballDesc (FilePath, Text)
 
 newtype SymbolName = SymbolName Text
+    deriving (Show, Eq, IsString)
 
 type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m)
 
 type Step c a = ReaderT c IO a
 
-newtype PackageExports = PackageExports [(ModuleName, [String])]
+-- | Type containing a package exported symbols.
+--
+-- Three elements:
+--
+-- * A Package database id.
+-- * For each module:
+--     * A name.
+--     * A list containing the exported symbols.
+newtype PackageExports = PackageExports (Package, [(ModuleName, [SymbolName])])
   deriving (Show, Eq)
 
 runStep :: Step c a -> c -> IO a
@@ -133,3 +148,6 @@ getName = pack . unPackageName . pkgName . name
 
 depsNames :: Package -> [String]
 depsNames pkg = unPackageName <$> toList (deps pkg)
+
+getModName :: ModuleName -> Text
+getModName x = intercalate "." (pack <$> components x)

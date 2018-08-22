@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module ExHack.Data.Db (
     mkHandle,
@@ -8,16 +9,18 @@ module ExHack.Data.Db (
     savePackages,
     savePackageDeps,
     savePackageMods,
-    saveModuleSymbols
+    saveModuleExports 
 ) where
 
-import Data.Maybe                  (listToMaybe)
+import Control.Monad.Catch         (MonadMask, Exception, throwM)
+import Data.Maybe                  (listToMaybe, maybe)
 import Data.Text                   (Text, pack)
 import Database.Selda    
 import Database.Selda.Backend      (MonadSelda(..))
 import qualified ExHack.Types as T (Package(..))
-import ExHack.Types                (ModuleName, DatabaseHandle, DatabaseStatus(..),
-                                    SymbolName(..), getName, depsNames)
+import ExHack.Types                (DatabaseHandle, DatabaseStatus(..),
+                                    PackageExports(..), SymbolName(..), getName, 
+                                    getModName, depsNames)
 
 mkHandle :: FilePath -> DatabaseHandle 'New
 mkHandle = id
@@ -66,12 +69,9 @@ initDb = tryCreateTable packages >> tryCreateTable dependancies >> tryCreateTabl
 -- populated before using this.
 savePackageDeps :: (MonadSelda m) => T.Package -> m ()
 savePackageDeps p = do
-  mpid <- query $ do
-    pks <- select packages
-    restrict (pks ! packageName .== (text . getName) p)
-    return $ pks ! packageId 
-  let resPackDeps = depsNames p 
-  mapM_ (\rowId -> saveDep rowId `mapM_` resPackDeps) (listToMaybe mpid)
+    mpid <- queryPkg p
+    let resPackDeps = depsNames p 
+    mapM_ (\rowId -> saveDep rowId `mapM_` resPackDeps) mpid
   where
     saveDep pid d = do
       mdid <- query $ do 
@@ -82,19 +82,41 @@ savePackageDeps p = do
 
 -- | Save a package list in the DB.
 savePackages :: (MonadSelda m) => [T.Package] -> m ()
-savePackages xs = insert_ packages $ generateCols <$> xs 
-  where
-    generateCols p = def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p
+savePackages xs = insert_ packages $ 
+    (\p -> def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p) <$> xs 
+
+data SaveModuleException = PackageNotInDatabase
+    deriving (Show)
+
+instance Exception SaveModuleException
 
 -- | Save the exposed modules of a package in the DB.
--- TODO: Why did I end up with a maybe moduleName???
-savePackageMods :: (MonadSelda m) => Maybe [ModuleName] -> RowID -> m ()
-savePackageMods (Just xs) pid = insert_ exposedModules $ generateCols <$> xs
-  where
-    generateCols m = def :*: pack (show m) :*: pid 
-savePackageMods _ _ = pure ()
+savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
+                => PackageExports -> m ()
+savePackageMods (PackageExports pe) = do
+    let !p = fst pe
+        !xs = snd pe
+        !mpid = T.dbId p
+    -- Potentially confusing:
+    --   * If we have a package id in the Package type, use it
+    --   * Otherwise retrieve the package id from the DB
+    --   * If the package is not in the DB, something weird happened...
+    --     Throw an error
+    pid <- maybe
+            (queryPkg p >>= maybe (throwM PackageNotInDatabase) pure)
+            pure
+            mpid
+    insert_ exposedModules $ 
+        (\(m,_) -> def :*: getModName m :*: pid) <$>  xs
 
-saveModuleSymbols :: (MonadSelda m) => RowID -> [SymbolName] -> m ()
-saveModuleSymbols mid xs = insert_ exposedSymbol $ generateCols <$> xs
-    where
-      generateCols (SymbolName s) = def :*: s :*: mid 
+saveModuleExports :: (MonadSelda m) => RowID -> [SymbolName] -> m ()
+saveModuleExports mid xs = insert_ exposedSymbol $ 
+    (\(SymbolName s) -> def :*: s :*: mid) <$> xs
+
+queryPkg :: (MonadSelda m) => T.Package -> m (Maybe RowID)
+queryPkg p = do
+    let r = query $ do
+            pks <- select packages
+            restrict (pks ! packageName .== (text . getName) p)
+            return $ pks ! packageId 
+    listToMaybe <$> r
