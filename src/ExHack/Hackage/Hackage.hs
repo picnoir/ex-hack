@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module ExHack.Hackage.Hackage (
     unpackHackageTarball,
     loadExposedModules,
@@ -10,20 +11,25 @@ module ExHack.Hackage.Hackage (
 import Data.List (isSuffixOf)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text.IO as T (readFile)
-import Distribution.ModuleName (ModuleName)
+import Distribution.ModuleName (ModuleName, toFilePath)
+import Control.Monad (filterM)
+import Control.Monad.Catch (Exception, MonadThrow, throwM)
 import Codec.Compression.GZip (decompress)
 import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS (ByteString)
 import qualified Data.ByteString.Lazy as BL (fromStrict)
-import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory)
+import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory,
+                         doesPathExist)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
 import ExHack.Types (PackageComponent(..), Package(exposedModules), 
                      TarballDesc(..), PackageExports(..), ComponentRoot(..))
 
-
+data PackageLoadError = CannotFindModuleFile ModuleName [ComponentRoot]
+    deriving (Show)
+instance Exception PackageLoadError
 
 -- | Unpack a tarball to a specified directory.
 unpackHackageTarball :: (MonadIO m) => 
@@ -66,14 +72,23 @@ getPackageExports pfp p = do
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 
-loadExposedModules :: (MonadIO m) => FilePath -> Package -> m [(ModuleName, DesugaredModule)] 
-loadExposedModules pfp p = (loadModule pfp) `mapM` fromMaybe mempty (mods <$> exposedModules p)
+loadExposedModules :: (MonadIO m, MonadThrow m) => FilePath -> Package -> m [(ModuleName, DesugaredModule)] 
+loadExposedModules pfp p = (loadModule pfp croots) `mapM` fromMaybe mempty (mods <$> exMods)
+    where
+        !exMods = exposedModules p 
+        croots :: [ComponentRoot]
+        !croots = fromMaybe [ComponentRoot "./"] (root <$> exMods)
 
-loadModule :: (MonadIO m) => FilePath -> ModuleName -> m (ModuleName, DesugaredModule)
-loadModule pfp mn = do
+loadModule :: forall m. (MonadIO m, MonadThrow m) => FilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
+loadModule pfp croots mn = do
     cr <- findComponentRoot 
     getDesugaredMod pfp cr mn >>= \m -> pure (mn,m)
   where
-      findComponentRoot :: m ComponentRoot  
-      findComponentRoot = undefined
-          -- 1 try to resolve paths for each root
+    testPath :: ComponentRoot -> m Bool
+    testPath (ComponentRoot p) = liftIO $ doesPathExist (p <> toFilePath mn <> ".hs")  
+    findComponentRoot :: m ComponentRoot  
+    findComponentRoot = do
+        xs <- filterM testPath (ComponentRoot "./" : croots)
+        if length xs == 1
+           then pure $ head xs
+           else throwM $ CannotFindModuleFile mn croots
