@@ -45,21 +45,21 @@ import Avail (AvailInfo(..))
 import Name (getOccString)
 import Lexer (Token(ITqvarid, ITvarid))
 
-import ExHack.Types (SymbolName(..))
+import ExHack.Types (SymbolName(..), ComponentRoot(..))
 
-getDesugaredMod :: (MonadIO m) => FilePath -> ModuleName -> m DesugaredModule 
-getDesugaredMod pfp mn = 
-    onModSum pfp mn (\modSum -> 
+getDesugaredMod :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
+getDesugaredMod pfp cr mn = 
+    onModSum pfp cr mn (\modSum -> 
         parseModule modSum >>= typecheckModule >>= desugarModule)
 
-getModImports :: (MonadIO m) => FilePath -> ModuleName -> m [String]
-getModImports pfp mn = 
-    onModSum pfp mn (\modSum ->
+getModImports :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [String]
+getModImports pfp cr mn = 
+    onModSum pfp cr mn (\modSum ->
         pure $ moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
-getModSymbols :: (MonadIO m) => FilePath -> ModuleName -> m [GenLocated SrcSpan String] 
-getModSymbols pfp mn =
-    withGhcEnv pfp mn $ do
+getModSymbols :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [GenLocated SrcSpan String] 
+getModSymbols pfp cr mn =
+    withGhcEnv pfp cr mn $ do
         m <- findModule (mkModuleName modName) Nothing 
         ts <- getTokenStream m
         pure $ (unpackFS . getTNames) <$$> filter filterTokenTypes ts
@@ -98,8 +98,8 @@ getAvName :: AvailInfo -> SymbolName
 getAvName (Avail n) = SymbolName $ pack $ getOccString n
 getAvName (AvailTC n _ _) = SymbolName $ pack $ getOccString n
 
-withGhcEnv :: (MonadIO m) => FilePath -> ModuleName -> Ghc a -> m a
-withGhcEnv pfp mn a = do 
+withGhcEnv :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> Ghc a -> m a
+withGhcEnv pfp (ComponentRoot cr) mn a = do 
     dflagsCM <- getCabalDynFlagsLib pfp
     -- TODO: Setup better logging
     when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
@@ -113,10 +113,10 @@ withGhcEnv pfp mn a = do
         _ <- load LoadAllTargets
         a
   where
-    fileName = "./" <> toFilePath mn
+    fileName = cr <> toFilePath mn
 
-onModSum :: (MonadIO m) => FilePath -> ModuleName -> (ModSummary -> Ghc a) -> m a
-onModSum pfp mn f = withGhcEnv pfp mn 
+onModSum :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> (ModSummary -> Ghc a) -> m a
+onModSum pfp cr mn f = withGhcEnv pfp cr mn 
                         (getModSummary (mkModuleName modName) >>= f)
     where
         modName = intercalate "." $ components mn 

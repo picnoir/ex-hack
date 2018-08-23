@@ -21,7 +21,7 @@ import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
 import ExHack.Types (PackageComponent(..), Package(exposedModules), 
-                     TarballDesc(..), PackageExports(..))
+                     TarballDesc(..), PackageExports(..), ComponentRoot(..))
 
 
 
@@ -70,4 +70,10 @@ loadExposedModules :: (MonadIO m) => FilePath -> Package -> m [(ModuleName, Desu
 loadExposedModules pfp p = (loadModule pfp) `mapM` fromMaybe mempty (mods <$> exposedModules p)
 
 loadModule :: (MonadIO m) => FilePath -> ModuleName -> m (ModuleName, DesugaredModule)
-loadModule pfp mn = getDesugaredMod pfp mn >>= \m -> pure (mn,m)
+loadModule pfp mn = do
+    cr <- findComponentRoot 
+    getDesugaredMod pfp cr mn >>= \m -> pure (mn,m)
+  where
+      findComponentRoot :: m ComponentRoot  
+      findComponentRoot = undefined
+          -- 1 try to resolve paths for each root
