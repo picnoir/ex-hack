@@ -3,6 +3,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 
 module ProcessingSteps (
     generateDb,
@@ -19,7 +21,7 @@ import Data.Maybe (fromJust)
 import Control.Lens (view)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader.Class (asks)
-import qualified Data.Text as T (unpack)
+import qualified Data.Text as T (unpack, pack)
 import qualified Data.Text.IO as T (readFile)
 import Database.Selda (SeldaM)
 import Database.Selda.SQLite (withSQLite)
@@ -35,15 +37,13 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      TarballsDir(..), CabalFilesDir(..), PackageDlDesc(..),
                      TarballDesc(..), Package(tarballPath),
                      PackageExports(..), WorkDir(..),
-                     packagedlDescName)
+                     MonadLog(..), packagedlDescName, logInfo)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
                        savePackageMods)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
                             newManager, Manager, httpLbs,
                             parseRequest_, responseBody)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-
-import Log (logProgress)
 
 -- general TODO: properly catch database exceptions
 
@@ -85,7 +85,7 @@ dlAssets packages = do
         step' <- step
         let pn = packagedlDescName p
         downloadHackageFiles cd td man p
-        liftIO $ logProgress "----" ("[" <> show step' <> "/" <> show totalSteps <> "] " <> T.unpack pn)
+        logInfo ("----" <> ("[" <> T.pack (show step') <> "/" <> T.pack (show totalSteps) <> "] " <> pn))
         return $ step' + 1
     downloadHackageFiles :: CabalFilesDir -> TarballsDir -> Manager -> PackageDlDesc -> m ()
     downloadHackageFiles 
@@ -108,18 +108,18 @@ genGraphDep pd = do
     dbHandle <- asks (view hasLens)
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
-    liftIO $ putStrLn "[+] Parsing cabal files."
+    logInfo "[+] Parsing cabal files."
     pkgs <- readPkgsFiles cd tbd `mapM` pd
     let pkgs' = getSuccParse (parseCabalFile <$> pkgs)
     -- 2
     liftIO $ withSQLite dbHandle $ do
-        liftIO $ putStrLn "[+] Saving packages to DB..."
+        logInfo "[+] Saving packages to DB..."
         savePackages pkgs'
-        liftIO $ putStrLn "[+] Done."
+        logInfo "[+] Done."
         -- 3
-        liftIO $ putStrLn "[+] Saving dependancies to DB..."
+        logInfo "[+] Saving dependancies to DB..."
         _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs'
-        liftIO $ putStrLn "[+] Done."
+        logInfo "[+] Done."
         return ()
     pure (dbHandle, pkgs')
   where
@@ -132,7 +132,8 @@ genGraphDep pd = do
     foldInsertDep totalDeps pkg step = do 
       step' <- step
       savePackageDeps pkg
-      liftIO $ logProgress "----" ("["++ show step' ++ "/" ++ show totalDeps ++ "] " ++ show pkg)
+      logInfo $ "----" <> "[" <> T.pack (show step') <> "/" <> T.pack (show totalDeps) 
+                <> "] " <> T.pack (show pkg)
       return $ step' + 1
 
 retrievePkgsExports :: forall c m.

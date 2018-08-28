@@ -26,6 +26,7 @@ module ExHack.Types (
     CabalFilesDir(..),
     WorkDir(..),
     PackageExports(..),
+    MonadLog(..),
     MonadStep,
     Step,
     tarballsDir,
@@ -41,20 +42,24 @@ module ExHack.Types (
     fromComponents
 ) where
 
+import Prelude hiding (replicate, length)
+
 import Control.Lens.TH (makeLenses)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.Reader (ReaderT, MonadReader, 
                              runReaderT)
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Set (Set, toList)
-import Data.Text (Text, pack, intercalate)
+import Data.Text (Text, pack, intercalate, replicate, length)
+import qualified Data.Text.IO as TIO (putStrLn, hPutStrLn) 
 import Data.String (IsString)
-import Database.Selda (RowID)
+import Database.Selda (RowID, SeldaM)
 import Distribution.ModuleName (ModuleName(..), fromComponents, components)
 import Distribution.Types.PackageId (PackageIdentifier(..), pkgName)
 import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
 import Distribution.Version (mkVersion)
 import System.FilePath (FilePath)
+import System.IO (stderr)
 
 import ExHack.Utils (Has(..))
 
@@ -132,7 +137,20 @@ newtype TarballDesc = TarballDesc (FilePath, Text)
 newtype SymbolName = SymbolName Text
     deriving (Show, Eq, IsString)
 
-type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m)
+class (Monad m) => MonadLog m where
+    logInfo, logError, logTitle :: Text -> m ()
+    logTitle txt = line >> logInfo ("* " <> txt <> " *") >> line
+        where !line = logInfo (replicate (length txt + 4) "*")
+
+instance (MonadIO m) => MonadLog (MonadStep c m) where
+    logInfo = liftIO . TIO.putStrLn
+    logError = liftIO . TIO.hPutStrLn stderr
+
+instance MonadLog SeldaM where
+    logInfo = liftIO . TIO.putStrLn
+    logError = liftIO . TIO.hPutStrLn stderr
+
+type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m, MonadLog m)
 
 type Step c a = ReaderT c IO a
 

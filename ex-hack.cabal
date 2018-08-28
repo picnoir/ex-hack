@@ -82,7 +82,6 @@ executable ex-hack
     , selda-sqlite
   other-modules:
     Cli,
-    Log,
     ProcessingSteps
   default-language: Haskell2010
 

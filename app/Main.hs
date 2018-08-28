@@ -9,13 +9,11 @@ import Data.Text.IO (readFile)
 
 import ExHack.Types (DatabaseStatus(..), Config(..), StackageFile(..), 
                      TarballsDir(..), CabalFilesDir(..),
-                     WorkDir(..), runStep)
+                     WorkDir(..), runStep, logTitle)
 import ExHack.Data.Db (mkHandle)
 
 import ProcessingSteps (generateDb, parseStackage,
                         dlAssets, genGraphDep)
-
-import Log (logTitle)
 
 type PreCondition = IO Bool
 

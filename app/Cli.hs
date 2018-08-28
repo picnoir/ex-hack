@@ -5,13 +5,10 @@ module Cli (
 
 import Control.Monad (when)
 
-import Log (logTitle)
-
 type PreCondition = IO Bool
 
 step :: String -> PreCondition -> IO () -> IO ()
 step n pc action = do
-  logTitle n
   preCond <- pc 
   when preCond action
 
