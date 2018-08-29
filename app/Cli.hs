@@ -8,7 +8,7 @@ import Control.Monad (when)
 type PreCondition = IO Bool
 
 step :: String -> PreCondition -> IO () -> IO ()
-step n pc action = do
+step _ pc action = do
   preCond <- pc 
   when preCond action
 

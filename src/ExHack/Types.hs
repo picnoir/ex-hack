@@ -1,12 +1,15 @@
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module ExHack.Types (
     Config(..),
@@ -45,9 +48,8 @@ module ExHack.Types (
 import Prelude hiding (replicate, length)
 
 import Control.Lens.TH (makeLenses)
-import Control.Monad.Catch (MonadMask)
-import Control.Monad.Reader (ReaderT, MonadReader, 
-                             runReaderT)
+import Control.Monad.Catch (MonadCatch, MonadThrow, MonadMask)
+import Control.Monad.Reader (ReaderT, MonadReader)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Set (Set, toList)
 import Data.Text (Text, pack, intercalate, replicate, length)
@@ -140,9 +142,15 @@ newtype SymbolName = SymbolName Text
 class (Monad m) => MonadLog m where
     logInfo, logError, logTitle :: Text -> m ()
     logTitle txt = line >> logInfo ("* " <> txt <> " *") >> line
-        where !line = logInfo (replicate (length txt + 4) "*")
+        where 
+            line :: m ()
+            !line = logInfo (replicate (length txt + 4) "*")
 
-instance (MonadIO m) => MonadLog (MonadStep c m) where
+instance MonadLog IO where
+    logInfo = TIO.putStrLn
+    logError = TIO.hPutStrLn stderr
+
+instance MonadLog (Step c s)  where
     logInfo = liftIO . TIO.putStrLn
     logError = liftIO . TIO.hPutStrLn stderr
 
@@ -152,8 +160,12 @@ instance MonadLog SeldaM where
 
 type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m, MonadLog m)
 
-type Step c a = ReaderT c IO a
+newtype Step c s a = Step (ReaderT (Config s) IO a)
+    deriving (Functor, Applicative, Monad, MonadIO,
+              MonadReader (Config s), MonadCatch, MonadThrow, MonadMask)
 
+runStep :: Step c s a -> Config s -> IO a
+runStep = undefined
 -- | Type containing a package exported symbols.
 --
 -- Three elements:
@@ -164,9 +176,6 @@ type Step c a = ReaderT c IO a
 --     * A list containing the exported symbols.
 newtype PackageExports = PackageExports (Package, [(ModuleName, [SymbolName])])
   deriving (Show, Eq)
-
-runStep :: Step c a -> c -> IO a
-runStep = runReaderT
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _)) = n
