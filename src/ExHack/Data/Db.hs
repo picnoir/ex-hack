@@ -14,7 +14,7 @@ module ExHack.Data.Db (
 ) where
 
 import Control.Monad.Catch                 (MonadMask, Exception, throwM)
-import qualified Data.HashMap.Strict as HM (HashMap, fromList)
+import qualified Data.HashMap.Strict as HM (fromList)
 import qualified Data.HashSet as HS        (HashSet, fromList)
 import Data.Maybe                          (listToMaybe, maybe)
 import Data.Text                           (Text, pack)
@@ -23,7 +23,7 @@ import Database.Selda.Backend              (MonadSelda(..))
 import qualified ExHack.Types as T         (Package(..))
 import ExHack.Types                (DatabaseHandle, DatabaseStatus(..),
                                     PackageExports(..), SymbolName(..), 
-                                    ModuleNameT(..),
+                                    ModuleNameT(..), ImportsScope,
                                     getName, getModName, depsNames)
 
 mkHandle :: FilePath -> DatabaseHandle 'New
@@ -55,9 +55,9 @@ modPack :: Selector (RowID :*: Text :*: RowID) RowID
                    :*: required "packID" `fk` (packages, packageId)
 
 exposedSymbols :: Table (RowID :*: Text :*: RowID)
+symId :: Selector (RowID :*: Text :*: RowID) RowID
 symName :: Selector (RowID :*: Text :*: RowID) Text
 symModId :: Selector (RowID :*: Text :*: RowID) RowID
-symId :: Selector (RowID :*: Text :*: RowID) RowID
 (exposedSymbols, symId :*: symName :*: symModId) = tableWithSelectors "exposedModules" $
                    autoPrimary "id"
                    :*: required "name"
@@ -97,6 +97,11 @@ data SaveModuleException = PackageNotInDatabase
 
 instance Exception SaveModuleException
 
+-- | Potentially confusing:
+--   * If we have a package id in the Package type, use it
+--   * Otherwise retrieve the package id from the DB
+--   * If the package is not in the DB, something weird happened...
+--     Throw an error
 getPackageId :: forall m. (MonadSelda m, MonadMask m)
              => T.Package -> m RowID
 getPackageId p = maybe
@@ -107,15 +112,8 @@ getPackageId p = maybe
 -- | Save the exposed modules of a package in the DB.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
                 => PackageExports -> m ()
-savePackageMods (PackageExports pe) = do
-    let !p = fst pe
-        !xs = snd pe
+savePackageMods (PackageExports (p, _, xs)) = do
     pid <- getPackageId p
-    -- Potentially confusing:
-    --   * If we have a package id in the Package type, use it
-    --   * Otherwise retrieve the package id from the DB
-    --   * If the package is not in the DB, something weird happened...
-    --     Throw an error
     insert_ exposedModules $ 
         (\(m,_) -> def :*: getModName m :*: pid) <$>  xs
 
@@ -131,22 +129,23 @@ queryPkg p = do
             return $ pks ! packageId 
     listToMaybe <$> r
 
-getPkgModules :: (MonadSelda m, MonadMask m) => T.Package -> m [ModuleNameT]
+getPkgModules :: (MonadSelda m, MonadMask m) => T.Package -> m [RowID]
 getPkgModules p = do
     pid <- getPackageId p
     q <- query $ do
         mods <- select exposedModules
         restrict (mods ! modPack .== literal pid)
-        return $ mods ! modName
-    pure $ ModuleNameT <$> q 
+        return $ mods ! modId
+    pure q 
 
-getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => T.Package -> m (HM.HashMap ModuleNameT (HS.HashSet SymbolName))
+getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => T.Package -> m ImportsScope
 getPkgImportScopes p = do
     mods <- getPkgModules p
+    -- TODO: Change mods to modid
     o <- sequence (wrapSyms <$> mods)
     pure $ HM.fromList o
   where
-    wrapSyms :: ModuleNameT -> m (ModuleNameT, HS.HashSet SymbolName)
+    wrapSyms :: RowID -> m (ModuleNameT, HS.HashSet SymbolName)
     wrapSyms mnt@(ModuleNameT modN) = do
         q <- query $ do
             mods <- select exposedModules 

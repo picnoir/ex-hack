@@ -21,12 +21,14 @@ import Data.Maybe (fromJust)
 import Control.Lens (view)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader.Class (asks)
+import Data.HashMap.Strict (filterWithKey)
 import qualified Data.Text as T (unpack, pack)
 import qualified Data.Text.IO as T (readFile)
 import Database.Selda (SeldaM)
 import Database.Selda.SQLite (withSQLite)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
+import ExHack.Ghc (getModImports, getModSymbols)
 import ExHack.Utils (Has(..))
 import ExHack.Hackage.Hackage (unpackHackageTarball, getPackageExports)
 import ExHack.Stackage.StackageParser (getHackageUrls,
@@ -35,11 +37,13 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      DatabaseStatus(..), PackageDlDesc,
                      StackageFile, StackageFile(..),
                      TarballsDir(..), CabalFilesDir(..), PackageDlDesc(..),
-                     TarballDesc(..), Package(tarballPath),
+                     TarballDesc(..), Package(tarballPath, allModules),
                      PackageExports(..), WorkDir(..),
-                     MonadLog(..), packagedlDescName, logInfo)
+                     MonadLog(..), ImportsScope, PackageComponent(..), ModuleName,
+                     ComponentRoot, PackageFilePath(..),
+                     packagedlDescName, logInfo)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
-                       savePackageMods)
+                       savePackageMods, getPkgImportScopes)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
                             newManager, Manager, httpLbs,
                             parseRequest_, responseBody)
@@ -158,15 +162,33 @@ retrievePkgsExports pkgs = do
 
 indexSymbols :: forall c m.
     (MonadStep c m,
-     Has c (DatabaseHandle 'DepsGraph))
+     Has c (DatabaseHandle 'PkgExports))
   => [PackageExports] -> m ()
-indexSymbols pkgs = indexPackage `mapM_` pkgs 
+indexSymbols pkgs = do
+    dbh <- asks (view hasLens)
+    indexPackage dbh `mapM_` pkgs 
   where
-    indexPackage :: PackageExports -> m ()
-    indexPackage = undefined
--- 1. Get all project's files => Embed this in PackageExports
--- 2. Get a project deps => Get that in Package
--- 3. For each file
+    indexPackage :: DatabaseHandle 'PkgExports -> PackageExports -> m ()
+    indexPackage !dbh (PackageExports (p, pfp, _)) = do
+        is <- liftIO $ withSQLite dbh $ getPkgImportScopes p
+        indexComponent dbh pfp is `mapM_` allModules p 
+        pure ()
+    indexComponent :: DatabaseHandle 'PkgExports -> PackageFilePath -> ImportsScope 
+                   -> PackageComponent -> m ()
+    indexComponent dbh pfp is pc = do
+        mfps <- findModuleFilePath pfp (roots pc) `mapM` mods pc
+        indexModule dbh pfp is `mapM_` mfps
+    indexModule :: DatabaseHandle 'PkgExports -> PackageFilePath -> ImportsScope 
+                -> (ModuleName, ComponentRoot) -> m ()
+    indexModule _ (PackageFilePath pfp) is (mn,cr) = do
+        imports <- getModImports pfp cr mn 
+        let fis = filterWithKey (\k _ -> k `elem` imports) is
+        syms <- getModSymbols pfp cr mn
+        -- 1. Symbols
+        undefined -- Filter retrieved mods + Save this to DB
+    findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
+    findModuleFilePath = undefined
+-- 3. For each file/module
 --    a. See what's imported => Get pack id + query db
 --    b. Create a "scope"
 --    c. Get the symbols

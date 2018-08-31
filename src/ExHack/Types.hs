@@ -16,6 +16,7 @@ module ExHack.Types (
     PackageComponent(..),
     Package(..),
     PackageIdentifier(..),
+    PackageFilePath(..),
     PackageName,
     PackageDlDesc(..),
     TarballDesc(..),
@@ -30,6 +31,7 @@ module ExHack.Types (
     WorkDir(..),
     PackageExports(..),
     MonadLog(..),
+    ImportsScope,
     MonadStep,
     Step,
     tarballsDir,
@@ -54,6 +56,8 @@ import Control.Monad.Reader (ReaderT, MonadReader)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Hashable (Hashable)
 import Data.Set (Set, toList)
+import qualified Data.HashMap.Strict as HM (HashMap)
+import qualified Data.HashSet as HS (HashSet)
 import Data.Text (Text, pack, intercalate, replicate, length)
 import qualified Data.Text.IO as TIO (putStrLn, hPutStrLn) 
 import Data.String (IsString)
@@ -75,7 +79,7 @@ newtype ComponentRoot = ComponentRoot FilePath
 -- | Cabal package component.
 data PackageComponent = PackageComponent {
     mods :: [ModuleName],
-    root :: [ComponentRoot]
+    roots :: [ComponentRoot]
 } deriving (Eq, Show)
 
 -- | Package main datatype.
@@ -177,16 +181,24 @@ newtype Step c s a = Step (ReaderT (Config s) IO a)
 
 runStep :: Step c s a -> Config s -> IO a
 runStep = undefined
+
+-- | Directory where a Haskell package has been extracted to.
+newtype PackageFilePath = PackageFilePath FilePath
+    deriving (Show, Eq)
+
 -- | Type containing a package exported symbols.
 --
 -- Three elements:
 --
--- * A Package database id.
+-- * A Package.
+-- * A filepath pointing to the directory where the tarball is extracted.
 -- * For each module:
 --     * A name.
 --     * A list containing the exported symbols.
-newtype PackageExports = PackageExports (Package, [(ModuleName, [SymbolName])])
+newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName, [SymbolName])])
   deriving (Show, Eq)
+
+type ImportsScope = HM.HashMap ModuleNameT (HS.HashSet SymbolName) 
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _)) = n

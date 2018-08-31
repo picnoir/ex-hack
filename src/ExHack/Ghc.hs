@@ -45,17 +45,17 @@ import Avail (AvailInfo(..))
 import Name (getOccString)
 import Lexer (Token(ITqvarid, ITvarid))
 
-import ExHack.Types (SymbolName(..), ComponentRoot(..))
+import ExHack.Types (SymbolName(..), ComponentRoot(..), ModuleNameT(..))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp cr mn = 
     onModSum pfp cr mn (\modSum -> 
         parseModule modSum >>= typecheckModule >>= desugarModule)
 
-getModImports :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [String]
+getModImports :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [ModuleNameT]
 getModImports pfp cr mn = 
     onModSum pfp cr mn (\modSum ->
-        pure $ moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
+        pure $ ModuleNameT . pack . moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
 getModSymbols :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [GenLocated SrcSpan String] 
 getModSymbols pfp cr mn =

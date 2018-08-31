@@ -9,7 +9,6 @@ module ExHack.Hackage.Hackage (
 ) where
 
 import Data.List (isSuffixOf)
-import Data.Maybe (fromMaybe)
 import qualified Data.Text.IO as T (readFile)
 import Distribution.ModuleName (ModuleName, toFilePath)
 import Control.Monad (filterM)
@@ -25,7 +24,8 @@ import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
 import ExHack.Types (PackageComponent(..), Package(exposedModules), 
-                     TarballDesc(..), PackageExports(..), ComponentRoot(..))
+                     TarballDesc(..), PackageExports(..), ComponentRoot(..),
+                     PackageFilePath(..))
 
 data PackageLoadError = CannotFindModuleFile ModuleName [ComponentRoot]
     deriving (Show)
@@ -68,16 +68,16 @@ getTarballDesc fp = do
 getPackageExports :: (MonadIO m) => FilePath -> Package -> m PackageExports
 getPackageExports pfp p = do
   em <- liftIO $ withCurrentDirectory pfp (loadExposedModules pfp p)
-  pure $ PackageExports (p, getExports <$> em)
+  pure $ PackageExports (p, PackageFilePath pfp, getExports <$> em)
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 
 loadExposedModules :: (MonadIO m, MonadThrow m) => FilePath -> Package -> m [(ModuleName, DesugaredModule)] 
-loadExposedModules pfp p = (loadModule pfp croots) `mapM` fromMaybe mempty (mods <$> exMods)
+loadExposedModules pfp p = loadModule pfp croots `mapM` maybe mempty mods exMods
     where
         !exMods = exposedModules p 
         croots :: [ComponentRoot]
-        !croots = fromMaybe [ComponentRoot "./"] (root <$> exMods)
+        !croots = maybe [ComponentRoot "./"] roots exMods
 
 loadModule :: forall m. (MonadIO m, MonadThrow m) => FilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
 loadModule pfp croots mn = do
