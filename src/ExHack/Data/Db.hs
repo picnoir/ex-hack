@@ -9,18 +9,22 @@ module ExHack.Data.Db (
     savePackages,
     savePackageDeps,
     savePackageMods,
-    saveModuleExports 
+    saveModuleExports,
+    getPkgImportScopes
 ) where
 
-import Control.Monad.Catch         (MonadMask, Exception, throwM)
-import Data.Maybe                  (listToMaybe, maybe)
-import Data.Text                   (Text, pack)
-import Database.Selda    
-import Database.Selda.Backend      (MonadSelda(..))
-import qualified ExHack.Types as T (Package(..))
+import Control.Monad.Catch                 (MonadMask, Exception, throwM)
+import qualified Data.HashMap.Strict as HM (HashMap, fromList)
+import qualified Data.HashSet as HS        (HashSet, fromList)
+import Data.Maybe                          (listToMaybe, maybe)
+import Data.Text                           (Text, pack)
+import Database.Selda
+import Database.Selda.Backend              (MonadSelda(..))
+import qualified ExHack.Types as T         (Package(..))
 import ExHack.Types                (DatabaseHandle, DatabaseStatus(..),
-                                    PackageExports(..), SymbolName(..), getName, 
-                                    getModName, depsNames)
+                                    PackageExports(..), SymbolName(..), 
+                                    ModuleNameT(..),
+                                    getName, getModName, depsNames)
 
 mkHandle :: FilePath -> DatabaseHandle 'New
 mkHandle = id
@@ -50,8 +54,11 @@ modPack :: Selector (RowID :*: Text :*: RowID) RowID
                    :*: required "name"
                    :*: required "packID" `fk` (packages, packageId)
 
-exposedSymbol :: Table (RowID :*: Text :*: RowID)
-exposedSymbol = table "exposedModules" $
+exposedSymbols :: Table (RowID :*: Text :*: RowID)
+symName :: Selector (RowID :*: Text :*: RowID) Text
+symModId :: Selector (RowID :*: Text :*: RowID) RowID
+symId :: Selector (RowID :*: Text :*: RowID) RowID
+(exposedSymbols, symId :*: symName :*: symModId) = tableWithSelectors "exposedModules" $
                    autoPrimary "id"
                    :*: required "name"
                    :*: required "modId" `fk` (exposedModules, modId)
@@ -82,7 +89,7 @@ savePackageDeps p = do
 
 -- | Save a package list in the DB.
 savePackages :: (MonadSelda m) => [T.Package] -> m ()
-savePackages xs = insert_ packages $ 
+savePackages xs = insert_ packages $
     (\p -> def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p) <$> xs 
 
 data SaveModuleException = PackageNotInDatabase
@@ -90,27 +97,30 @@ data SaveModuleException = PackageNotInDatabase
 
 instance Exception SaveModuleException
 
+getPackageId :: forall m. (MonadSelda m, MonadMask m)
+             => T.Package -> m RowID
+getPackageId p = maybe
+    (queryPkg p >>= maybe (throwM PackageNotInDatabase) pure)
+    pure
+    (T.dbId p)
+
 -- | Save the exposed modules of a package in the DB.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
                 => PackageExports -> m ()
 savePackageMods (PackageExports pe) = do
     let !p = fst pe
         !xs = snd pe
-        !mpid = T.dbId p
+    pid <- getPackageId p
     -- Potentially confusing:
     --   * If we have a package id in the Package type, use it
     --   * Otherwise retrieve the package id from the DB
     --   * If the package is not in the DB, something weird happened...
     --     Throw an error
-    pid <- maybe
-            (queryPkg p >>= maybe (throwM PackageNotInDatabase) pure)
-            pure
-            mpid
     insert_ exposedModules $ 
         (\(m,_) -> def :*: getModName m :*: pid) <$>  xs
 
 saveModuleExports :: (MonadSelda m) => RowID -> [SymbolName] -> m ()
-saveModuleExports mid xs = insert_ exposedSymbol $ 
+saveModuleExports mid xs = insert_ exposedSymbols $ 
     (\(SymbolName s) -> def :*: s :*: mid) <$> xs
 
 queryPkg :: (MonadSelda m) => T.Package -> m (Maybe RowID)
@@ -120,3 +130,28 @@ queryPkg p = do
             restrict (pks ! packageName .== (text . getName) p)
             return $ pks ! packageId 
     listToMaybe <$> r
+
+getPkgModules :: (MonadSelda m, MonadMask m) => T.Package -> m [ModuleNameT]
+getPkgModules p = do
+    pid <- getPackageId p
+    q <- query $ do
+        mods <- select exposedModules
+        restrict (mods ! modPack .== literal pid)
+        return $ mods ! modName
+    pure $ ModuleNameT <$> q 
+
+getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => T.Package -> m (HM.HashMap ModuleNameT (HS.HashSet SymbolName))
+getPkgImportScopes p = do
+    mods <- getPkgModules p
+    o <- sequence (wrapSyms <$> mods)
+    pure $ HM.fromList o
+  where
+    wrapSyms :: ModuleNameT -> m (ModuleNameT, HS.HashSet SymbolName)
+    wrapSyms mnt@(ModuleNameT modN) = do
+        q <- query $ do
+            mods <- select exposedModules 
+            syms <- select exposedSymbols
+            restrict (mods ! modName .== text modN)
+            restrict (syms ! symModId .== mods ! modId)
+            pure $ syms ! symName
+        pure (mnt, HS.fromList (SymbolName <$> q)) 

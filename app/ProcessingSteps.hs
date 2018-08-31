@@ -160,11 +160,14 @@ indexSymbols :: forall c m.
     (MonadStep c m,
      Has c (DatabaseHandle 'DepsGraph))
   => [PackageExports] -> m ()
-indexSymbols = undefined
--- 1. Get all project's files
--- 2. Get a project deps
+indexSymbols pkgs = indexPackage `mapM_` pkgs 
+  where
+    indexPackage :: PackageExports -> m ()
+    indexPackage = undefined
+-- 1. Get all project's files => Embed this in PackageExports
+-- 2. Get a project deps => Get that in Package
 -- 3. For each file
---    a. See what's imported
+--    a. See what's imported => Get pack id + query db
 --    b. Create a "scope"
 --    c. Get the symbols
 --    d. Filter the symbols.

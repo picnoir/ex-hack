@@ -9,7 +9,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module ExHack.Types (
     Config(..),
@@ -21,6 +20,7 @@ module ExHack.Types (
     PackageDlDesc(..),
     TarballDesc(..),
     ModuleName(..),
+    ModuleNameT(..),
     SymbolName(..),
     DatabaseHandle,
     DatabaseStatus(..),
@@ -40,6 +40,7 @@ module ExHack.Types (
     mkVersion,
     getName,
     getModName,
+    getModNameT,
     depsNames,
     packagedlDescName,
     fromComponents
@@ -51,6 +52,7 @@ import Control.Lens.TH (makeLenses)
 import Control.Monad.Catch (MonadCatch, MonadThrow, MonadMask)
 import Control.Monad.Reader (ReaderT, MonadReader)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Hashable (Hashable)
 import Data.Set (Set, toList)
 import Data.Text (Text, pack, intercalate, replicate, length)
 import qualified Data.Text.IO as TIO (putStrLn, hPutStrLn) 
@@ -65,14 +67,18 @@ import System.IO (stderr)
 
 import ExHack.Utils (Has(..))
 
+-- | Cabal component root filepath. The module names should be
+--   resolved using this filepath as root.
 newtype ComponentRoot = ComponentRoot FilePath
     deriving (IsString, Eq, Show)
 
+-- | Cabal package component.
 data PackageComponent = PackageComponent {
     mods :: [ModuleName],
     root :: [ComponentRoot]
 } deriving (Eq, Show)
 
+-- | Package main datatype.
 data Package = Package {
   name :: PackageIdentifier,
   deps :: Set PackageName,
@@ -136,8 +142,13 @@ newtype PackageDlDesc = PackageDlDesc (Text,Text,Text)
 --
 newtype TarballDesc = TarballDesc (FilePath, Text)
 
+-- Needed: cabal's ModuleName is not hashable but we still
+-- want to use it as a hashmap key
+newtype ModuleNameT = ModuleNameT Text
+    deriving (Show, Eq, IsString, Hashable)
+
 newtype SymbolName = SymbolName Text
-    deriving (Show, Eq, IsString)
+    deriving (Show, Eq, IsString, Hashable)
 
 class (Monad m) => MonadLog m where
     logInfo, logError, logTitle :: Text -> m ()
@@ -188,3 +199,6 @@ depsNames pkg = unPackageName <$> toList (deps pkg)
 
 getModName :: ModuleName -> Text
 getModName x = intercalate "." (pack <$> components x)
+
+getModNameT :: ModuleName -> ModuleNameT
+getModNameT x = ModuleNameT $ intercalate "." (pack <$> components x)
