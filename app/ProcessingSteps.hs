@@ -40,10 +40,10 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      TarballDesc(..), Package(tarballPath, allModules),
                      PackageExports(..), WorkDir(..),
                      MonadLog(..), ImportsScope, PackageComponent(..), ModuleName,
-                     ComponentRoot, PackageFilePath(..),
-                     packagedlDescName, logInfo)
+                     ComponentRoot, PackageFilePath(..), IndexedModuleNameT(..),
+                     LocatedSym(..), UnifiedSym(..), packagedlDescName, logInfo)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
-                       savePackageMods, getPkgImportScopes)
+                       savePackageMods, getPkgImportScopes, saveUnifiedSymbols)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
                             newManager, Manager, httpLbs,
                             parseRequest_, responseBody)
@@ -180,14 +180,17 @@ indexSymbols pkgs = do
         indexModule dbh pfp is `mapM_` mfps
     indexModule :: DatabaseHandle 'PkgExports -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
-    indexModule _ (PackageFilePath pfp) is (mn,cr) = do
+    indexModule dbh (PackageFilePath pfp) is (mn,cr) = do
         imports <- getModImports pfp cr mn 
-        let fis = filterWithKey (\k _ -> k `elem` imports) is
+        let fis = filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
         syms <- getModSymbols pfp cr mn
-        -- 1. Symbols
-        undefined -- Filter retrieved mods + Save this to DB
+        let unsyms = unifySymbols fis syms
+        withSQLite dbh $  saveUnifiedSymbols unsyms
+        undefined -- Run selda actions in DB 
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
     findModuleFilePath = undefined
+    unifySymbols :: ImportsScope -> [LocatedSym] -> [UnifiedSym]
+    unifySymbols = undefined
 -- 3. For each file/module
 --    a. See what's imported => Get pack id + query db
 --    b. Create a "scope"

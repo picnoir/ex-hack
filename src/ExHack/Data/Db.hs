@@ -10,7 +10,8 @@ module ExHack.Data.Db (
     savePackageDeps,
     savePackageMods,
     saveModuleExports,
-    getPkgImportScopes
+    getPkgImportScopes,
+    saveUnifiedSymbols
 ) where
 
 import Control.Monad.Catch                 (MonadMask, Exception, throwM)
@@ -19,11 +20,13 @@ import qualified Data.HashSet as HS        (HashSet, fromList)
 import Data.Maybe                          (listToMaybe, maybe)
 import Data.Text                           (Text, pack)
 import Database.Selda
-import Database.Selda.Backend              (MonadSelda(..))
+import Database.Selda.Backend              (MonadSelda(..), SqlValue(SqlInt))
 import qualified ExHack.Types as T         (Package(..))
 import ExHack.Types                (DatabaseHandle, DatabaseStatus(..),
-                                    PackageExports(..), SymbolName(..), 
+                                    PackageExports(..), SymName(..), 
                                     ModuleNameT(..), ImportsScope,
+                                    IndexedModuleNameT(..), IndexedSym(..),
+                                    UnifiedSym(..),
                                     getName, getModName, depsNames)
 
 mkHandle :: FilePath -> DatabaseHandle 'New
@@ -117,9 +120,9 @@ savePackageMods (PackageExports (p, _, xs)) = do
     insert_ exposedModules $ 
         (\(m,_) -> def :*: getModName m :*: pid) <$>  xs
 
-saveModuleExports :: (MonadSelda m) => RowID -> [SymbolName] -> m ()
+saveModuleExports :: (MonadSelda m) => RowID -> [SymName] -> m ()
 saveModuleExports mid xs = insert_ exposedSymbols $ 
-    (\(SymbolName s) -> def :*: s :*: mid) <$> xs
+    (\(SymName s) -> def :*: s :*: mid) <$> xs
 
 queryPkg :: (MonadSelda m) => T.Package -> m (Maybe RowID)
 queryPkg p = do
@@ -129,28 +132,34 @@ queryPkg p = do
             return $ pks ! packageId 
     listToMaybe <$> r
 
-getPkgModules :: (MonadSelda m, MonadMask m) => T.Package -> m [RowID]
+getPkgModules :: (MonadSelda m, MonadMask m) => T.Package -> m [IndexedModuleNameT]
 getPkgModules p = do
     pid <- getPackageId p
     q <- query $ do
         mods <- select exposedModules
         restrict (mods ! modPack .== literal pid)
-        return $ mods ! modId
-    pure q 
+        return $ (mods ! modId :*: mods ! modName)
+    pure $ wrapResult <$> q 
+  where
+    wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId i)
 
 getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => T.Package -> m ImportsScope
 getPkgImportScopes p = do
     mods <- getPkgModules p
-    -- TODO: Change mods to modid
     o <- sequence (wrapSyms <$> mods)
     pure $ HM.fromList o
   where
-    wrapSyms :: RowID -> m (ModuleNameT, HS.HashSet SymbolName)
-    wrapSyms mnt@(ModuleNameT modN) = do
+    wrapSyms :: IndexedModuleNameT -> m (IndexedModuleNameT, HS.HashSet IndexedSym)
+    wrapSyms mnt@(IndexedModuleNameT (_, i)) = do
+        let mid = fromSql $ SqlInt i :: RowID
         q <- query $ do
             mods <- select exposedModules 
             syms <- select exposedSymbols
-            restrict (mods ! modName .== text modN)
+            restrict (mods ! modId .== literal mid)
             restrict (syms ! symModId .== mods ! modId)
-            pure $ syms ! symName
-        pure (mnt, HS.fromList (SymbolName <$> q)) 
+            pure $ syms ! symId :*: syms ! symName
+        pure (mnt, HS.fromList (wrapResult <$> q)) 
+    wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId i)
+
+saveUnifiedSymbols :: forall m. (MonadSelda m, MonadMask m) => [UnifiedSym] -> m ()
+saveUnifiedSymbols = undefined

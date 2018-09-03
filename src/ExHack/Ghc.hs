@@ -45,7 +45,7 @@ import Avail (AvailInfo(..))
 import Name (getOccString)
 import Lexer (Token(ITqvarid, ITvarid))
 
-import ExHack.Types (SymbolName(..), ComponentRoot(..), ModuleNameT(..))
+import ExHack.Types (SymName(..), ComponentRoot(..), ModuleNameT(..), LocatedSym(..))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp cr mn = 
@@ -57,12 +57,13 @@ getModImports pfp cr mn =
     onModSum pfp cr mn (\modSum ->
         pure $ ModuleNameT . pack . moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
-getModSymbols :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [GenLocated SrcSpan String] 
+getModSymbols :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
 getModSymbols pfp cr mn =
     withGhcEnv pfp cr mn $ do
         m <- findModule (mkModuleName modName) Nothing 
         ts <- getTokenStream m
-        pure $ (unpackFS . getTNames) <$$> filter filterTokenTypes ts
+        --pure $ (unpackFS . getTNames) <$$> filter filterTokenTypes ts
+        pure undefined
         where
             modName = intercalate "." $ components mn
             filterTokenTypes (L _ (ITqvarid _)) = True   
@@ -71,7 +72,7 @@ getModSymbols pfp cr mn =
             getTNames (ITqvarid (_,n)) = n
             getTNames (ITvarid n) = n
             getTNames _ = error "The impossible happened."
-            (<$$>) = fmap . fmap
+            --(<$$>) = fmap . fmap
 
 getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do
@@ -88,15 +89,15 @@ getModUnitId = moduleUnitId . mg_module . dm_core_module
 getModName :: DesugaredModule -> String
 getModName = moduleNameString . moduleName . mg_module . dm_core_module
 
-getModExports :: DesugaredModule -> [SymbolName]
+getModExports :: DesugaredModule -> [SymName]
 getModExports = fmap getAvName . mg_exports . dm_core_module
 
 getContent :: DesugaredModule -> TypecheckedSource
 getContent = tm_typechecked_source . dm_typechecked_module
 
-getAvName :: AvailInfo -> SymbolName
-getAvName (Avail n) = SymbolName $ pack $ getOccString n
-getAvName (AvailTC n _ _) = SymbolName $ pack $ getOccString n
+getAvName :: AvailInfo -> SymName
+getAvName (Avail n) = SymName $ pack $ getOccString n
+getAvName (AvailTC n _ _) = SymName $ pack $ getOccString n
 
 withGhcEnv :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> Ghc a -> m a
 withGhcEnv pfp (ComponentRoot cr) mn a = do 

@@ -22,7 +22,11 @@ module ExHack.Types (
     TarballDesc(..),
     ModuleName(..),
     ModuleNameT(..),
-    SymbolName(..),
+    IndexedModuleNameT(..),
+    SymName(..),
+    LocatedSym(..),
+    IndexedSym(..),
+    UnifiedSym(..),
     DatabaseHandle,
     DatabaseStatus(..),
     StackageFile(..),
@@ -56,6 +60,7 @@ import Control.Monad.Reader (ReaderT, MonadReader)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Hashable (Hashable)
 import Data.Set (Set, toList)
+import GHC (GenLocated(..), SrcSpan)
 import qualified Data.HashMap.Strict as HM (HashMap)
 import qualified Data.HashSet as HS (HashSet)
 import Data.Text (Text, pack, intercalate, replicate, length)
@@ -146,13 +151,31 @@ newtype PackageDlDesc = PackageDlDesc (Text,Text,Text)
 --
 newtype TarballDesc = TarballDesc (FilePath, Text)
 
--- Needed: cabal's ModuleName is not hashable but we still
--- want to use it as a hashmap key
+-- | Kind of cabal's ModuleName duplicate internally using Text. We want to be able
+--   to hash the module name, cabal one's cannot, hence this datatype.
 newtype ModuleNameT = ModuleNameT Text
     deriving (Show, Eq, IsString, Hashable)
 
-newtype SymbolName = SymbolName Text
+-- | Module being indexed in the dabase.
+newtype IndexedModuleNameT = IndexedModuleNameT (ModuleNameT, Int)
+    deriving (Show, Eq, Hashable)
+
+-- | Source code symbol.
+newtype SymName = SymName Text
     deriving (Show, Eq, IsString, Hashable)
+
+-- | Symbol having been indexed in the database.
+--   Contains both a symbol name as well as its database identifier.
+newtype IndexedSym = IndexedSym (SymName, Int)
+    deriving (Show, Eq, Hashable)
+
+-- | Occurence of a symbol in a source code file.
+newtype LocatedSym = LocatedSym (SymName, Package, FilePath, GenLocated SrcSpan SymName)
+    deriving (Eq)
+
+newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
+    deriving (Eq)
+
 
 class (Monad m) => MonadLog m where
     logInfo, logError, logTitle :: Text -> m ()
@@ -195,10 +218,10 @@ newtype PackageFilePath = PackageFilePath FilePath
 -- * For each module:
 --     * A name.
 --     * A list containing the exported symbols.
-newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName, [SymbolName])])
+newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName, [SymName])])
   deriving (Show, Eq)
 
-type ImportsScope = HM.HashMap ModuleNameT (HS.HashSet SymbolName) 
+type ImportsScope = HM.HashMap IndexedModuleNameT (HS.HashSet IndexedSym) 
 
 packagedlDescName :: PackageDlDesc -> Text
 packagedlDescName (PackageDlDesc (n, _, _)) = n
