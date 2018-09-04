@@ -222,6 +222,9 @@ newtype PackageFilePath = PackageFilePath FilePath
 newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName, [SymName])])
   deriving (Show, Eq)
 
+-- | Symbols imported in a module file.
+--
+--   This datastructure is optimizing the lookups, allowing 
 type ImportsScope = HM.HashMap IndexedModuleNameT (HS.HashSet IndexedSym) 
 
 packagedlDescName :: PackageDlDesc -> Text

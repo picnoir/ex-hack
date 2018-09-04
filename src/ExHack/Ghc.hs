@@ -10,6 +10,7 @@ module ExHack.Ghc (
   getModImports,
   getModSymbols,
   getContent,
+  unLoc
   ) where
 
 import Data.List (intercalate)

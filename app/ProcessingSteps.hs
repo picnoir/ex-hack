@@ -15,15 +15,18 @@ module ProcessingSteps (
     indexSymbols
 ) where
 
-import qualified Data.ByteString.Lazy as BL (writeFile)
-import qualified Data.ByteString as BS (readFile)
-import Data.Maybe (fromJust, listToMaybe)
 import Control.Lens (view)
 import Control.Monad (filterM)
 import Control.Monad.Catch (throwM, MonadCatch, MonadThrow)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader.Class (asks)
-import Data.HashMap.Strict (filterWithKey)
+import qualified Data.ByteString.Lazy as BL (writeFile)
+import qualified Data.ByteString as BS (readFile)
+import Data.Maybe (fromJust, listToMaybe)
+import qualified Data.HashMap.Strict as HM (HashMap, filterWithKey, empty, elems,
+                                            insert, lookup)
+import qualified Data.HashSet as HS (unions, foldl')
+import Data.List (foldl')
 import qualified Data.Text as T (unpack, pack)
 import qualified Data.Text.IO as T (readFile)
 import Database.Selda (SeldaM)
@@ -32,7 +35,7 @@ import Distribution.ModuleName (toFilePath)
 import System.Directory (doesFileExist)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
-import ExHack.Ghc (getModImports, getModSymbols)
+import ExHack.Ghc (getModImports, getModSymbols, unLoc)
 import ExHack.Utils (Has(..))
 import ExHack.Hackage.Hackage (unpackHackageTarball, getPackageExports)
 import ExHack.Stackage.StackageParser (getHackageUrls,
@@ -45,7 +48,8 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      PackageExports(..), WorkDir(..),
                      MonadLog(..), ImportsScope, PackageComponent(..), ModuleName,
                      ComponentRoot(..), PackageFilePath(..), IndexedModuleNameT(..),
-                     LocatedSym(..), UnifiedSym(..), ModuleFileError(..), packagedlDescName, logInfo)
+                     LocatedSym(..), UnifiedSym(..), ModuleFileError(..), 
+                     IndexedSym(..), SymName, packagedlDescName, logInfo)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
                        savePackageMods, getPkgImportScopes, saveUnifiedSymbols)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
@@ -164,6 +168,15 @@ retrievePkgsExports pkgs = do
         tbp <- unpackHackageTarball wd tb  
         getPackageExports tbp p
 
+-- | Indexes the code source symbols in the database.
+--
+-- For each package, component and module, this step will:
+--
+-- 1. Retrieve the imported symbols and try to match them to the previously
+--    indexed package exports.
+-- 2. Use GHC parser to get this file symbols.
+-- 3. Unify these symbols to the imported one.
+-- 4. We save each unified occurence in the database.
 indexSymbols :: forall c m.
     (MonadStep c m,
      MonadCatch m,
@@ -188,20 +201,22 @@ indexSymbols pkgs = do
                 -> (ModuleName, ComponentRoot) -> m ()
     indexModule dbh p (PackageFilePath pfp) is (mn,cr) = do
         imports <- getModImports pfp cr mn 
-        let fis = filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
+        -- fis: filtered import scope according to this module imports
+        -- isyms: imported symbols hashmap on which we will perform the unification
+        let !fis = HM.filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
+            !isyms = HS.unions $ HM.elems fis
+            !isymsMap = HS.foldl' (\hm is'@(IndexedSym (n, _)) -> HM.insert n is' hm) HM.empty isyms 
         syms <- getModSymbols p pfp cr mn
-        let unsyms = unifySymbols fis syms
+        let !unsyms = unifySymbols isymsMap syms
         withSQLite dbh $  saveUnifiedSymbols unsyms
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
     findModuleFilePath (PackageFilePath pfp) crs mn = do
-        mcr <- listToMaybe <$> filterM tryCr crs 
+        mcr <- listToMaybe <$> filterM testCr crs 
         maybe (throwM $ CannotFindModuleFile $ show mn) (\cr -> pure (mn, cr)) mcr
       where
-          tryCr (ComponentRoot cr) = liftIO $ doesFileExist $ pfp <> cr <> toFilePath mn
-    unifySymbols :: ImportsScope -> [LocatedSym] -> [UnifiedSym]
-    unifySymbols = undefined
--- 3. For each file/module
---    a. See what's imported => Get pack id + query db
---    b. Create a "scope"
---    c. Get the symbols
---    d. Filter the symbols.
+        testCr (ComponentRoot cr) = liftIO $ doesFileExist $ pfp <> cr <> toFilePath mn
+    unifySymbols :: HM.HashMap SymName IndexedSym -> [LocatedSym] -> [UnifiedSym]
+    unifySymbols isyms = foldl' foldLSym []
+      where
+        foldLSym xs ls@(LocatedSym (_, _, locSym)) = 
+            maybe xs (\is -> UnifiedSym(is,ls) : xs) (HM.lookup (unLoc locSym) isyms) 
