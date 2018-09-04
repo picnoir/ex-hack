@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-module ProcessingSteps (
+module ExHack.ProcessingSteps (
     generateDb,
     parseStackage,
     dlAssets,

@@ -12,8 +12,8 @@ import ExHack.Types (DatabaseStatus(..), Config(..), StackageFile(..),
                      WorkDir(..), runStep, logTitle)
 import ExHack.Data.Db (mkHandle)
 
-import ProcessingSteps (generateDb, parseStackage,
-                        dlAssets, genGraphDep)
+import ExHack.ProcessingSteps (generateDb, parseStackage,
+                               dlAssets, genGraphDep)
 
 type PreCondition = IO Bool
 
