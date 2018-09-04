@@ -35,8 +35,7 @@ import GHC (runGhc, getSessionDynFlags,
             dm_typechecked_module, tm_typechecked_source,
             parseDynamicFlags, noLoc, TypecheckedSource,
             ModSummary, Ghc, unLoc, ms_textual_imps, 
-            GenLocated(..), findModule, getTokenStream,
-            SrcSpan)
+            GenLocated(..), findModule, getTokenStream)
 import GHC.Paths (libdir)
 import FastString (unpackFS)
 import Module (UnitId(..))
@@ -45,7 +44,9 @@ import Avail (AvailInfo(..))
 import Name (getOccString)
 import Lexer (Token(ITqvarid, ITvarid))
 
-import ExHack.Types (SymName(..), ComponentRoot(..), ModuleNameT(..), LocatedSym(..))
+import ExHack.Types (SymName(..), ComponentRoot(..), 
+                     ModuleNameT(..), LocatedSym(..),
+                     Package(..))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp cr mn = 
@@ -57,13 +58,13 @@ getModImports pfp cr mn =
     onModSum pfp cr mn (\modSum ->
         pure $ ModuleNameT . pack . moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
-getModSymbols :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
-getModSymbols pfp cr mn =
+getModSymbols :: (MonadIO m) => Package -> FilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
+getModSymbols p pfp cr@(ComponentRoot crs) mn =
     withGhcEnv pfp cr mn $ do
         m <- findModule (mkModuleName modName) Nothing 
         ts <- getTokenStream m
-        --pure $ (unpackFS . getTNames) <$$> filter filterTokenTypes ts
-        pure undefined
+        let sns = (SymName . pack . unpackFS . getTNames) <$$> filter filterTokenTypes ts
+        pure $ (\sn -> LocatedSym (p, fileName, sn)) <$> sns 
         where
             modName = intercalate "." $ components mn
             filterTokenTypes (L _ (ITqvarid _)) = True   
@@ -72,7 +73,8 @@ getModSymbols pfp cr mn =
             getTNames (ITqvarid (_,n)) = n
             getTNames (ITvarid n) = n
             getTNames _ = error "The impossible happened."
-            --(<$$>) = fmap . fmap
+            (<$$>) = fmap . fmap
+            fileName = crs <> toFilePath mn
 
 getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do

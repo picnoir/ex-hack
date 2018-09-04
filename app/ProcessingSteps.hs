@@ -17,8 +17,10 @@ module ProcessingSteps (
 
 import qualified Data.ByteString.Lazy as BL (writeFile)
 import qualified Data.ByteString as BS (readFile)
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, listToMaybe)
 import Control.Lens (view)
+import Control.Monad (filterM)
+import Control.Monad.Catch (throwM, MonadCatch, MonadThrow)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader.Class (asks)
 import Data.HashMap.Strict (filterWithKey)
@@ -26,6 +28,8 @@ import qualified Data.Text as T (unpack, pack)
 import qualified Data.Text.IO as T (readFile)
 import Database.Selda (SeldaM)
 import Database.Selda.SQLite (withSQLite)
+import Distribution.ModuleName (toFilePath)
+import System.Directory (doesFileExist)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Ghc (getModImports, getModSymbols)
@@ -40,8 +44,8 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      TarballDesc(..), Package(tarballPath, allModules),
                      PackageExports(..), WorkDir(..),
                      MonadLog(..), ImportsScope, PackageComponent(..), ModuleName,
-                     ComponentRoot, PackageFilePath(..), IndexedModuleNameT(..),
-                     LocatedSym(..), UnifiedSym(..), packagedlDescName, logInfo)
+                     ComponentRoot(..), PackageFilePath(..), IndexedModuleNameT(..),
+                     LocatedSym(..), UnifiedSym(..), ModuleFileError(..), packagedlDescName, logInfo)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
                        savePackageMods, getPkgImportScopes, saveUnifiedSymbols)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
@@ -162,6 +166,8 @@ retrievePkgsExports pkgs = do
 
 indexSymbols :: forall c m.
     (MonadStep c m,
+     MonadCatch m,
+     MonadThrow m,
      Has c (DatabaseHandle 'PkgExports))
   => [PackageExports] -> m ()
 indexSymbols pkgs = do
@@ -171,24 +177,27 @@ indexSymbols pkgs = do
     indexPackage :: DatabaseHandle 'PkgExports -> PackageExports -> m ()
     indexPackage !dbh (PackageExports (p, pfp, _)) = do
         is <- liftIO $ withSQLite dbh $ getPkgImportScopes p
-        indexComponent dbh pfp is `mapM_` allModules p 
+        indexComponent dbh p pfp is `mapM_` allModules p 
         pure ()
-    indexComponent :: DatabaseHandle 'PkgExports -> PackageFilePath -> ImportsScope 
+    indexComponent :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                    -> PackageComponent -> m ()
-    indexComponent dbh pfp is pc = do
+    indexComponent dbh p pfp is pc = do
         mfps <- findModuleFilePath pfp (roots pc) `mapM` mods pc
-        indexModule dbh pfp is `mapM_` mfps
-    indexModule :: DatabaseHandle 'PkgExports -> PackageFilePath -> ImportsScope 
+        indexModule dbh p pfp is `mapM_` mfps
+    indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
-    indexModule dbh (PackageFilePath pfp) is (mn,cr) = do
+    indexModule dbh p (PackageFilePath pfp) is (mn,cr) = do
         imports <- getModImports pfp cr mn 
         let fis = filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
-        syms <- getModSymbols pfp cr mn
+        syms <- getModSymbols p pfp cr mn
         let unsyms = unifySymbols fis syms
         withSQLite dbh $  saveUnifiedSymbols unsyms
-        undefined -- Run selda actions in DB 
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
-    findModuleFilePath = undefined
+    findModuleFilePath (PackageFilePath pfp) crs mn = do
+        mcr <- listToMaybe <$> filterM tryCr crs 
+        maybe (throwM $ CannotFindModuleFile $ show mn) (\cr -> pure (mn, cr)) mcr
+      where
+          tryCr (ComponentRoot cr) = liftIO $ doesFileExist $ pfp <> cr <> toFilePath mn
     unifySymbols :: ImportsScope -> [LocatedSym] -> [UnifiedSym]
     unifySymbols = undefined
 -- 3. For each file/module

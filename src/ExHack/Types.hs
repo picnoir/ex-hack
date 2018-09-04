@@ -38,6 +38,7 @@ module ExHack.Types (
     ImportsScope,
     MonadStep,
     Step,
+    ModuleFileError(..),
     tarballsDir,
     cabalFilesDir,
     workDir,
@@ -55,8 +56,8 @@ module ExHack.Types (
 import Prelude hiding (replicate, length)
 
 import Control.Lens.TH (makeLenses)
-import Control.Monad.Catch (MonadCatch, MonadThrow, MonadMask)
-import Control.Monad.Reader (ReaderT, MonadReader)
+import Control.Monad.Catch (MonadCatch, MonadThrow, MonadMask, Exception)
+import Control.Monad.Reader (ReaderT, MonadReader, runReaderT)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Hashable (Hashable)
 import Data.Set (Set, toList)
@@ -170,7 +171,7 @@ newtype IndexedSym = IndexedSym (SymName, Int)
     deriving (Show, Eq, Hashable)
 
 -- | Occurence of a symbol in a source code file.
-newtype LocatedSym = LocatedSym (SymName, Package, FilePath, GenLocated SrcSpan SymName)
+newtype LocatedSym = LocatedSym (Package, FilePath, GenLocated SrcSpan SymName)
     deriving (Eq)
 
 newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
@@ -203,7 +204,7 @@ newtype Step c s a = Step (ReaderT (Config s) IO a)
               MonadReader (Config s), MonadCatch, MonadThrow, MonadMask)
 
 runStep :: Step c s a -> Config s -> IO a
-runStep = undefined
+runStep (Step r) = runReaderT r
 
 -- | Directory where a Haskell package has been extracted to.
 newtype PackageFilePath = PackageFilePath FilePath
@@ -237,3 +238,10 @@ getModName x = intercalate "." (pack <$> components x)
 
 getModNameT :: ModuleName -> ModuleNameT
 getModNameT x = ModuleNameT $ intercalate "." (pack <$> components x)
+
+-- Exceptions
+-- =================
+
+data ModuleFileError = CannotFindModuleFile String
+    deriving (Show, Eq)
+instance Exception ModuleFileError
