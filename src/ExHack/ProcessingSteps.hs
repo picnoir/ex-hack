@@ -51,7 +51,7 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      LocatedSym(..), UnifiedSym(..), ModuleFileError(..), 
                      IndexedSym(..), SymName, packagedlDescName, logInfo)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
-                       savePackageMods, getPkgImportScopes, saveUnifiedSymbols)
+                       savePackageMods, getPkgImportScopes, saveModuleUnifiedSymbols)
 import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
                             newManager, Manager, httpLbs,
                             parseRequest_, responseBody)
@@ -157,8 +157,8 @@ retrievePkgsExports pkgs = do
     dbHandle <- asks (view hasLens)
     wd <- asks (view hasLens) 
     pkgsExports <- getPkgExports wd `mapM` pkgs
-    let seldaActions = savePackageMods <$> pkgsExports
-    _ <- liftIO $ withSQLite dbHandle $ sequence seldaActions
+    let seldaActions = savePackageMods `mapM` pkgsExports
+    _ <- liftIO $ withSQLite dbHandle $ seldaActions
     pure (dbHandle, pkgsExports)
   where
     -- TODO think about error handling here.
@@ -208,7 +208,9 @@ indexSymbols pkgs = do
             !isymsMap = HS.foldl' (\hm is'@(IndexedSym (n, _)) -> HM.insert n is' hm) HM.empty isyms 
         syms <- getModSymbols p pfp cr mn
         let !unsyms = unifySymbols isymsMap syms
-        withSQLite dbh $  saveUnifiedSymbols unsyms
+            -- TODO: Move file searching from GHC to somewhere I can access from here.
+            file = undefined
+        withSQLite dbh $ saveModuleUnifiedSymbols unsyms file 
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
     findModuleFilePath (PackageFilePath pfp) crs mn = do
         mcr <- listToMaybe <$> filterM testCr crs 

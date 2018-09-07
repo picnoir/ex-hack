@@ -11,7 +11,7 @@ module ExHack.Data.Db (
     savePackageMods,
     saveModuleExports,
     getPkgImportScopes,
-    saveUnifiedSymbols
+    saveModuleUnifiedSymbols
 ) where
 
 import Control.Monad.Catch                 (MonadMask, Exception, throwM)
@@ -26,8 +26,10 @@ import ExHack.Types                (DatabaseHandle, DatabaseStatus(..),
                                     PackageExports(..), SymName(..), 
                                     ModuleNameT(..), ImportsScope,
                                     IndexedModuleNameT(..), IndexedSym(..),
-                                    UnifiedSym(..),
+                                    UnifiedSym(..), SourceCodeFile(..),
+                                    PackageNameT(..), LocatedSym(..),
                                     getName, getModName, depsNames)
+import GHC (SrcSpan(..), getLoc, srcSpanStartLine, srcSpanStartCol)
 
 mkHandle :: FilePath -> DatabaseHandle 'New
 mkHandle = id
@@ -61,10 +63,29 @@ exposedSymbols :: Table (RowID :*: Text :*: RowID)
 symId :: Selector (RowID :*: Text :*: RowID) RowID
 symName :: Selector (RowID :*: Text :*: RowID) Text
 symModId :: Selector (RowID :*: Text :*: RowID) RowID
-(exposedSymbols, symId :*: symName :*: symModId) = tableWithSelectors "exposedModules" $
+(exposedSymbols, symId :*: symName :*: symModId) = tableWithSelectors "exposedSymbols" $
                    autoPrimary "id"
                    :*: required "name"
                    :*: required "modId" `fk` (exposedModules, modId)
+
+sourceFiles :: Table (RowID :*: Text :*: Text :*: Text)
+fileId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
+(sourceFiles, fileId :*: _ :*: _ :*: _)
+  = tableWithSelectors "sourceFiles" $
+    autoPrimary "id"
+    :*: required "fileContent"
+    :*: required "modName"
+    :*: required "packName"
+
+symbolOccurences :: Table (RowID :*: Int :*: Int :*: RowID :*: RowID)
+(symbolOccurences, _ :*: _ :*: _ :*: _) 
+  = tableWithSelectors "symbolOccurences" $
+    autoPrimary "id"
+    :*: required "column"
+    :*: required "line"
+    :*: required "sourceFileId" `fk` (sourceFiles, fileId)
+    :*: required "importedSymID" `fk` (exposedSymbols, symId)
+
 
 -- | Create the internal database schema.
 initDb :: (MonadSelda m) => m ()
@@ -112,17 +133,20 @@ getPackageId p = maybe
     pure
     (T.dbId p)
 
--- | Save the exposed modules of a package in the DB.
+-- | Save the exposed modules as well as their exposed symbols.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
                 => PackageExports -> m ()
 savePackageMods (PackageExports (p, _, xs)) = do
     pid <- getPackageId p
-    insert_ exposedModules $ 
-        (\(m,_) -> def :*: getModName m :*: pid) <$>  xs
+    saveMod pid `mapM_` xs
+  where
+    saveMod pid (m, syms) = do
+        mid <- insertWithPK exposedModules [def :*: getModName m :*: pid]
+        insert_  exposedSymbols $ (\(SymName sn) -> def :*: sn :*: mid) <$> syms
 
-saveModuleExports :: (MonadSelda m) => RowID -> [SymName] -> m ()
-saveModuleExports mid xs = insert_ exposedSymbols $ 
-    (\(SymName s) -> def :*: s :*: mid) <$> xs
+saveModuleExports :: (MonadSelda m) => Int -> [SymName] -> m ()
+saveModuleExports midi xs = insert_ exposedSymbols $ 
+    (\(SymName s) -> def :*: s :*: fromSql (SqlInt midi)) <$> xs
 
 queryPkg :: (MonadSelda m) => T.Package -> m (Maybe RowID)
 queryPkg p = do
@@ -161,5 +185,15 @@ getPkgImportScopes p = do
         pure (mnt, HS.fromList (wrapResult <$> q)) 
     wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId i)
 
-saveUnifiedSymbols :: forall m. (MonadSelda m, MonadMask m) => [UnifiedSym] -> m ()
-saveUnifiedSymbols = undefined
+saveModuleUnifiedSymbols :: forall m. (MonadSelda m, MonadMask m) => [UnifiedSym] -> SourceCodeFile -> m ()
+saveModuleUnifiedSymbols xs (SourceCodeFile f (ModuleNameT mnt) (PackageNameT pnt)) = do
+    fid <- insertWithPK sourceFiles [def :*:  f :*: mnt :*: pnt]
+    insert_ symbolOccurences $ generateLine fid <$> xs
+  where
+      generateLine fid (UnifiedSym (IndexedSym (_, sidi), LocatedSym (_, _, gloc))) = 
+          def :*: col :*: line :*: fid :*: sid 
+        where
+          (RealSrcSpan loc) = getLoc gloc
+          !line = srcSpanStartLine loc
+          !col = srcSpanStartCol loc
+          !sid = fromSql (SqlInt sidi)

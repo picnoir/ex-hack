@@ -18,6 +18,7 @@ module ExHack.Types (
     PackageIdentifier(..),
     PackageFilePath(..),
     PackageName,
+    PackageNameT(..),
     PackageDlDesc(..),
     TarballDesc(..),
     ModuleName(..),
@@ -39,6 +40,7 @@ module ExHack.Types (
     MonadStep,
     Step,
     ModuleFileError(..),
+    SourceCodeFile(..),
     tarballsDir,
     cabalFilesDir,
     workDir,
@@ -117,6 +119,7 @@ data Config a = Config {
     _workDir :: WorkDir
 }
 
+
 makeLenses ''Config
 
 instance Has (Config 'New) (DatabaseHandle 'New) where
@@ -157,6 +160,9 @@ newtype TarballDesc = TarballDesc (FilePath, Text)
 newtype ModuleNameT = ModuleNameT Text
     deriving (Show, Eq, IsString, Hashable)
 
+newtype PackageNameT = PackageNameT Text
+    deriving (Show, Eq, IsString, Hashable)
+
 -- | Module being indexed in the dabase.
 newtype IndexedModuleNameT = IndexedModuleNameT (ModuleNameT, Int)
     deriving (Show, Eq, Hashable)
@@ -177,6 +183,7 @@ newtype LocatedSym = LocatedSym (Package, FilePath, GenLocated SrcSpan SymName)
 newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
     deriving (Eq)
 
+data SourceCodeFile = SourceCodeFile Text ModuleNameT PackageNameT
 
 class (Monad m) => MonadLog m where
     logInfo, logError, logTitle :: Text -> m ()
