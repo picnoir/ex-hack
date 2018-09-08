@@ -50,7 +50,7 @@ library
       text,
       yaml,
       safe,
-      selda,
+      selda >= 0.2 && <0.3,
       transformers,
       selda-sqlite,
       zlib
@@ -81,7 +81,7 @@ executable ex-hack
     , lens
     , mtl
     , text
-    , selda
+    , selda >= 0.2 && <0.3
     , selda-sqlite
   other-modules:
     Cli
