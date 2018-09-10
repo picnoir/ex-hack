@@ -1,10 +1,9 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 
 module ExHack.ProcessingSteps (
     generateDb,
@@ -15,55 +14,74 @@ module ExHack.ProcessingSteps (
     indexSymbols
 ) where
 
-import Control.Lens (view)
-import Control.Monad.Catch (MonadCatch, MonadThrow)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader.Class (asks)
-import qualified Data.ByteString.Lazy as BL (writeFile)
-import qualified Data.ByteString as BS (readFile)
-import Data.Maybe (fromJust)
-import qualified Data.HashMap.Strict as HM (HashMap, filterWithKey, empty, elems,
-                                            insert, lookup)
-import qualified Data.HashSet as HS (unions, foldl')
-import Data.List (foldl')
-import qualified Data.Text as T (unpack, pack)
-import qualified Data.Text.IO as T (readFile)
-import Database.Selda (SeldaM)
-import Database.Selda.SQLite (withSQLite)
-import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
-                            newManager, Manager, httpLbs,
-                            parseRequest_, responseBody)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
+import           Control.Lens                   (view)
+import           Control.Monad.Catch            (MonadCatch, MonadThrow)
+import           Control.Monad.IO.Class         (liftIO)
+import           Control.Monad.Reader.Class     (asks)
+import qualified Data.ByteString                as BS (readFile)
+import qualified Data.ByteString.Lazy           as BL (writeFile)
+import qualified Data.HashMap.Strict            as HM (HashMap, elems, empty,
+                                                       filterWithKey, insert,
+                                                       lookup)
+import qualified Data.HashSet                   as HS (foldl', unions)
+import           Data.List                      (foldl')
+import           Data.Maybe                     (fromJust)
+import qualified Data.Text                      as T (pack, unpack)
+import qualified Data.Text.IO                   as T (readFile)
+import           Database.Selda                 (SeldaM)
+import           Database.Selda.SQLite          (withSQLite)
+import           Network.HTTP.Client            (Manager, httpLbs,
+                                                 managerSetProxy, newManager,
+                                                 parseRequest_,
+                                                 proxyEnvironment, responseBody)
+import           Network.HTTP.Client.TLS        (tlsManagerSettings)
 
-import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
-import ExHack.Ghc (getModImports, getModSymbols, unLoc)
-import ExHack.Utils (Has(..))
-import ExHack.Hackage.Hackage (unpackHackageTarball, getPackageExports,
-                               findComponentRoot)
-import ExHack.ModulePaths (toModFilePath)
-import ExHack.Stackage.StackageParser (getHackageUrls,
-                                       parseStackageYaml)
-import ExHack.Types (MonadStep, DatabaseHandle,
-                     DatabaseStatus(..), PackageDlDesc,
-                     StackageFile, StackageFile(..),
-                     TarballsDir(..), CabalFilesDir(..), PackageDlDesc(..),
-                     TarballDesc(..), Package(tarballPath, allModules),
-                     PackageExports(..), WorkDir(..),
-                     MonadLog(..), ImportsScope, PackageComponent(..), ModuleName,
-                     ComponentRoot(..), PackageFilePath(..), IndexedModuleNameT(..),
-                     LocatedSym(..), UnifiedSym(..),
-                     IndexedSym(..), SymName, SourceCodeFile(..),
-                     packagedlDescName, logInfo, getModNameT, getPackageNameT)
-import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
-                       savePackageMods, getPkgImportScopes, saveModuleUnifiedSymbols)
+import           ExHack.Cabal.CabalParser       (getSuccParse, parseCabalFile)
+import           ExHack.Data.Db                 (getPkgImportScopes, initDb,
+                                                 saveModuleUnifiedSymbols,
+                                                 savePackageDeps,
+                                                 savePackageMods, savePackages)
+import           ExHack.Ghc                     (getModImports, getModSymbols,
+                                                 unLoc)
+import           ExHack.Hackage.Hackage         (findComponentRoot,
+                                                 getPackageExports,
+                                                 unpackHackageTarball)
+import           ExHack.ModulePaths             (toModFilePath)
+import           ExHack.Stackage.StackageParser (getHackageUrls,
+                                                 parseStackageYaml)
+import           ExHack.Types                   (CabalFilesDir (..),
+                                                 ComponentRoot (..),
+                                                 DatabaseHandle,
+                                                 DatabaseStatus (..),
+                                                 ImportsScope,
+                                                 IndexedModuleNameT (..),
+                                                 IndexedSym (..),
+                                                 LocatedSym (..), ModuleName,
+                                                 MonadLog (..), MonadStep,
+                                                 Package (allModules, tarballPath),
+                                                 PackageComponent (..),
+                                                 PackageDlDesc,
+                                                 PackageDlDesc (..),
+                                                 PackageExports (..),
+                                                 PackageFilePath (..),
+                                                 SourceCodeFile (..),
+                                                 StackageFile (..), SymName,
+                                                 TarballDesc (..),
+                                                 TarballsDir (..),
+                                                 UnifiedSym (..), WorkDir (..),
+                                                 getModNameT, getPackageNameT,
+                                                 logInfo, packagedlDescName)
+import           ExHack.Utils                   (Has (..))
 
 -- general TODO: properly catch database exceptions
 
 generateDb :: forall c m. 
     (Has c (DatabaseHandle 'New), 
+     MonadLog m,
      MonadStep c m) 
     => m (DatabaseHandle 'Initialized)
 generateDb = do
+    logInfo "test"
     fp <- asks (view hasLens)
     withSQLite fp initDb
     pure fp
@@ -158,7 +176,7 @@ retrievePkgsExports pkgs = do
     wd <- asks (view hasLens) 
     pkgsExports <- getPkgExports wd `mapM` pkgs
     let seldaActions = savePackageMods `mapM` pkgsExports
-    _ <- liftIO $ withSQLite dbHandle $ seldaActions
+    _ <- liftIO $ withSQLite dbHandle seldaActions
     pure (dbHandle, pkgsExports)
   where
     -- TODO think about error handling here.

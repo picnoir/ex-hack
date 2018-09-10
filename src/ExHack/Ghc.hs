@@ -13,41 +13,41 @@ module ExHack.Ghc (
   unLoc
   ) where
 
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad (when)
-import Data.Maybe (isNothing, fromMaybe)
-import Data.Text (pack)
-import Distribution.ModuleName (ModuleName, toFilePath)
-import qualified Distribution.Helper as H (mkQueryEnv, runQuery, 
-                                           ghcOptions, components, 
-                                           ChComponentName(ChLibName))
-import Safe (headMay)
-import System.FilePath((</>))
--- GHC modules
-import GHC (runGhc, getSessionDynFlags,
-            setSessionDynFlags, guessTarget,
-            setTargets, load, LoadHowMuch(..),
-            getModSummary, mkModuleName,
-            parseModule, typecheckModule,
-            desugarModule, DesugaredModule,
-            moduleUnitId, dm_core_module,
-            moduleNameString, moduleName,
-            dm_typechecked_module, tm_typechecked_source,
-            parseDynamicFlags, noLoc, TypecheckedSource,
-            ModSummary, Ghc, unLoc, ms_textual_imps, 
-            GenLocated(..), findModule, getTokenStream)
-import GHC.Paths (libdir)
-import FastString (unpackFS)
-import Module (UnitId(..))
-import HscTypes (ModGuts(..))
-import Avail (AvailInfo(..))
-import Name (getOccString)
-import Lexer (Token(ITqvarid, ITvarid))
+import           Avail                   (AvailInfo (..))
+import           Control.Monad           (when)
+import           Control.Monad.IO.Class  (MonadIO, liftIO)
+import           Data.Maybe              (fromMaybe, isNothing)
+import           Data.Text               (pack)
+import qualified Distribution.Helper     as H (ChComponentName (ChLibName),
+                                               components, ghcOptions,
+                                               mkQueryEnv, runQuery)
+import           Distribution.ModuleName (ModuleName, toFilePath)
+import           FastString              (unpackFS)
+import           GHC                     (DesugaredModule, GenLocated (..), Ghc,
+                                          LoadHowMuch (..), ModSummary,
+                                          TypecheckedSource, desugarModule,
+                                          dm_core_module, dm_typechecked_module,
+                                          findModule, getModSummary,
+                                          getSessionDynFlags, getTokenStream,
+                                          guessTarget, load, mkModuleName,
+                                          moduleName, moduleNameString,
+                                          moduleUnitId, ms_textual_imps, noLoc,
+                                          parseDynamicFlags, parseModule,
+                                          runGhc, setSessionDynFlags,
+                                          setTargets, tm_typechecked_source,
+                                          typecheckModule, unLoc)
+import           GHC.Paths               (libdir)
+import           HscTypes                (ModGuts (..))
+import           Lexer                   (Token (ITqvarid, ITvarid))
+import           Module                  (UnitId (..))
+import           Name                    (getOccString)
+import           Safe                    (headMay)
+import           System.FilePath         ((</>))
 
-import ExHack.ModulePaths (modName)
-import ExHack.Types (SymName(..), ComponentRoot(..), 
-                     ModuleNameT(..), LocatedSym(..),
-                     Package(..))
+import           ExHack.ModulePaths      (modName)
+import           ExHack.Types            (ComponentRoot (..), LocatedSym (..),
+                                          ModuleNameT (..), Package (..),
+                                          SymName (..))
 
 getDesugaredMod :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp cr mn = 

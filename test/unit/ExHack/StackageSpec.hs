@@ -1,15 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module ExHack.StackageSpec (spec) where
 
-import Data.FileEmbed
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import Data.Text.Encoding (decodeUtf8)
-import Test.Hspec (describe, it, Spec, shouldBe)
+import           Data.FileEmbed
+import qualified Data.Map                       as Map
+import qualified Data.Set                       as Set
+import           Data.Text.Encoding             (decodeUtf8)
+import           Test.Hspec                     (Spec, describe, it, shouldBe)
 
-import ExHack.Stackage.StackageParser (parseStackageYaml)
-import ExHack.Stackage.StackageTypes  (Packages(..), PackagePlan(..))
+import           ExHack.Stackage.StackageParser (parseStackageYaml)
+import           ExHack.Stackage.StackageTypes  (PackagePlan (..),
+                                                 Packages (..))
 
 spec :: Spec
 spec = describe "parseStackageYaml" $ 

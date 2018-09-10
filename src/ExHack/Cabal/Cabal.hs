@@ -2,11 +2,11 @@ module ExHack.Cabal.Cabal (
   buildPackage
 ) where
 
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import System.Directory (withCurrentDirectory)
-import System.Exit (ExitCode(..))
-import System.Environment (unsetEnv)
-import System.Process (readProcessWithExitCode )
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           System.Directory       (withCurrentDirectory)
+import           System.Environment     (unsetEnv)
+import           System.Exit            (ExitCode (..))
+import           System.Process         (readProcessWithExitCode)
 
 buildPackage :: MonadIO m => FilePath -> m (Maybe (Int, String))
 buildPackage fp = liftIO $ withCurrentDirectory fp (installDeps >> build)

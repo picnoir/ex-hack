@@ -6,15 +6,16 @@ module ExHack.ModulePaths (
     toModFilePath
 ) where
 
-import Data.List (intercalate)
-import Distribution.ModuleName (ModuleName, components, toFilePath)
-import Control.Monad (filterM)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Catch (MonadThrow, throwM)
-import System.Directory (doesPathExist)
+import           Control.Monad           (filterM)
+import           Control.Monad.Catch     (MonadThrow, throwM)
+import           Control.Monad.IO.Class  (MonadIO, liftIO)
+import           Data.List               (intercalate)
+import           Distribution.ModuleName (ModuleName, components, toFilePath)
+import           System.Directory        (doesPathExist)
 
-import ExHack.Types (ComponentRoot(..), PackageLoadError(..),
-                     PackageFilePath(..))
+import           ExHack.Types            (ComponentRoot (..),
+                                          PackageFilePath (..),
+                                          PackageLoadError (..))
 
 modName :: ModuleName -> String
 modName mn = intercalate "." $ components mn

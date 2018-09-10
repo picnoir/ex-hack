@@ -1,16 +1,17 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module ExHack.Stackage.StackageTypes (
   PackagePlan(..),
   Packages(..)
 ) where
 
-import Data.Aeson (FromJSON(..), (.:?), (.:), (.!=), withObject)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import Data.Text (Text)
-import Distribution.Types.PackageName (PackageName)
+import           Data.Aeson                     (FromJSON (..), withObject,
+                                                 (.!=), (.:), (.:?))
+import qualified Data.Map                       as Map
+import qualified Data.Set                       as Set
+import           Data.Text                      (Text)
+import           Distribution.Types.PackageName (PackageName)
 import qualified Distribution.Types.PackageName as C (mkPackageName)
 
 newtype Packages = Packages (Map.Map PackageName PackagePlan) deriving (Show, Eq)

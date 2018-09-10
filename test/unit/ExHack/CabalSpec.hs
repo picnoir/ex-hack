@@ -1,17 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module ExHack.CabalSpec (spec) where
 
-import Data.FileEmbed (embedFile)
-import Data.Maybe (maybeToList)
-import Data.Text.Encoding (decodeUtf8)
-import Data.Set (fromList)
-import Test.Hspec (Spec, describe, it, shouldBe)
+import           Data.FileEmbed           (embedFile)
+import           Data.Maybe               (maybeToList)
+import           Data.Set                 (fromList)
+import           Data.Text.Encoding       (decodeUtf8)
+import           Test.Hspec               (Spec, describe, it, shouldBe)
 
-import ExHack.Cabal.CabalParser (parseCabalFile, runParseResult)
-import ExHack.Types (PackageIdentifier(..), TarballDesc(..), Package(..),
-                     PackageComponent(..), ComponentRoot(..), mkVersion, fromComponents)
+import           ExHack.Cabal.CabalParser (parseCabalFile, runParseResult)
+import           ExHack.Types             (ComponentRoot (..), Package (..),
+                                           PackageComponent (..),
+                                           PackageIdentifier (..),
+                                           TarballDesc (..), fromComponents,
+                                           mkVersion)
 
 spec :: Spec
 spec = describe "parseCabalFile" $

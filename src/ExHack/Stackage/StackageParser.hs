@@ -4,15 +4,16 @@ module ExHack.Stackage.StackageParser (
   getHackageUrls
 ) where
 
-import Data.Map   (foldlWithKey)
-import Data.Text  (Text)
-import qualified Data.Text as T
-import Data.Text.Encoding as E
-import Data.Yaml (decodeEither')
+import           Data.Map                       (foldlWithKey)
+import           Data.Text                      (Text)
+import qualified Data.Text                      as T
+import           Data.Text.Encoding             as E
+import           Data.Yaml                      (decodeEither')
 import qualified Distribution.Types.PackageName as C
 
-import ExHack.Stackage.StackageTypes (Packages(..), PackagePlan(..))
-import ExHack.Types (PackageDlDesc(..))
+import           ExHack.Stackage.StackageTypes  (PackagePlan (..),
+                                                 Packages (..))
+import           ExHack.Types                   (PackageDlDesc (..))
 
 parseStackageYaml :: Text -> Maybe Packages
 parseStackageYaml t = case decodeEither' $ E.encodeUtf8 t of

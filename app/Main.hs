@@ -3,17 +3,17 @@
 
 module Main where
 
-import Prelude hiding (readFile)
-import Data.Text.IO (readFile)
+import           Data.Text.IO           (readFile)
+import           Prelude                hiding (readFile)
 
 
-import ExHack.Types (DatabaseStatus(..), Config(..), StackageFile(..), 
-                     TarballsDir(..), CabalFilesDir(..),
-                     WorkDir(..), runStep, logTitle)
-import ExHack.Data.Db (mkHandle)
-
-import ExHack.ProcessingSteps (generateDb, parseStackage,
-                               dlAssets, genGraphDep)
+import           ExHack.Data.Db         (mkHandle)
+import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
+                                         parseStackage)
+import           ExHack.Types           (CabalFilesDir (..), Config (..),
+                                         DatabaseStatus (..), StackageFile (..),
+                                         TarballsDir (..), WorkDir (..),
+                                         logTitle, runStep)
 
 type PreCondition = IO Bool
 

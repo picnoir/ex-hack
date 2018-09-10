@@ -1,7 +1,7 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module ExHack.Data.Db (
     mkHandle,
@@ -14,22 +14,23 @@ module ExHack.Data.Db (
     saveModuleUnifiedSymbols
 ) where
 
-import Control.Monad.Catch                 (MonadMask, Exception, throwM)
-import qualified Data.HashMap.Strict as HM (fromList)
-import qualified Data.HashSet as HS        (HashSet, fromList)
-import Data.Maybe                          (listToMaybe, maybe)
-import Data.Text                           (Text, pack)
-import Database.Selda
-import Database.Selda.Backend              (MonadSelda(..), SqlValue(SqlInt))
-import qualified ExHack.Types as T         (Package(..))
-import ExHack.Types                (DatabaseHandle, DatabaseStatus(..),
-                                    PackageExports(..), SymName(..), 
-                                    ModuleNameT(..), ImportsScope,
-                                    IndexedModuleNameT(..), IndexedSym(..),
-                                    UnifiedSym(..), SourceCodeFile(..),
-                                    PackageNameT(..), LocatedSym(..),
-                                    getName, getModName, depsNames)
-import GHC (SrcSpan(..), getLoc, srcSpanStartLine, srcSpanStartCol)
+import           Control.Monad.Catch    (Exception, MonadMask, throwM)
+import qualified Data.HashMap.Strict    as HM (fromList)
+import qualified Data.HashSet           as HS (HashSet, fromList)
+import           Data.Maybe             (listToMaybe, maybe)
+import           Data.Text              (Text, pack)
+import           Database.Selda
+import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
+import           ExHack.Types           (DatabaseHandle, DatabaseStatus (..),
+                                         ImportsScope, IndexedModuleNameT (..),
+                                         IndexedSym (..), LocatedSym (..),
+                                         ModuleNameT (..), PackageExports (..),
+                                         PackageNameT (..), SourceCodeFile (..),
+                                         SymName (..), UnifiedSym (..),
+                                         depsNames, getModName, getName)
+import qualified ExHack.Types           as T (Package (..))
+import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
+                                         srcSpanStartLine)
 
 mkHandle :: FilePath -> DatabaseHandle 'New
 mkHandle = id
@@ -162,7 +163,7 @@ getPkgModules p = do
     q <- query $ do
         mods <- select exposedModules
         restrict (mods ! modPack .== literal pid)
-        return $ (mods ! modId :*: mods ! modName)
+        return (mods ! modId :*: mods ! modName)
     pure $ wrapResult <$> q 
   where
     wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId i)

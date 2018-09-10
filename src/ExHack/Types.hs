@@ -56,29 +56,35 @@ module ExHack.Types (
     fromComponents
 ) where
 
-import Prelude hiding (replicate, length)
+import           Prelude                        hiding (length, replicate)
 
-import Control.Lens.TH (makeLenses)
-import Control.Monad.Catch (MonadCatch, MonadThrow, MonadMask, Exception)
-import Control.Monad.Reader (ReaderT, MonadReader, runReaderT)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Hashable (Hashable)
-import Data.Set (Set, toList)
-import GHC (GenLocated(..), SrcSpan)
-import qualified Data.HashMap.Strict as HM (HashMap)
-import qualified Data.HashSet as HS (HashSet)
-import Data.Text (Text, pack, intercalate, replicate, length)
-import qualified Data.Text.IO as TIO (putStrLn, hPutStrLn) 
-import Data.String (IsString)
-import Database.Selda (RowID, SeldaM)
-import Distribution.ModuleName (ModuleName(..), fromComponents, components)
-import Distribution.Types.PackageId (PackageIdentifier(..), pkgName)
-import Distribution.Types.PackageName (PackageName, unPackageName, mkPackageName)
-import Distribution.Version (mkVersion)
-import System.FilePath (FilePath)
-import System.IO (stderr)
+import           Control.Lens.TH                (makeLenses)
+import           Control.Monad.Catch            (Exception, MonadCatch,
+                                                 MonadMask, MonadThrow)
+import           Control.Monad.IO.Class         (MonadIO, liftIO)
+import           Control.Monad.Reader           (MonadReader, ReaderT,
+                                                 runReaderT)
+import           Data.Hashable                  (Hashable)
+import qualified Data.HashMap.Strict            as HM (HashMap)
+import qualified Data.HashSet                   as HS (HashSet)
+import           Data.Set                       (Set, toList)
+import           Data.String                    (IsString)
+import           Data.Text                      (Text, intercalate, length,
+                                                 pack, replicate)
+import qualified Data.Text.IO                   as TIO (hPutStrLn, putStrLn)
+import           Database.Selda                 (RowID, SeldaM)
+import           Distribution.ModuleName        (ModuleName (..), components,
+                                                 fromComponents)
+import           Distribution.Types.PackageId   (PackageIdentifier (..),
+                                                 pkgName)
+import           Distribution.Types.PackageName (PackageName, mkPackageName,
+                                                 unPackageName)
+import           Distribution.Version           (mkVersion)
+import           GHC                            (GenLocated (..), SrcSpan)
+import           System.FilePath                (FilePath)
+import           System.IO                      (stderr)
 
-import ExHack.Utils (Has(..))
+import           ExHack.Utils                   (Has (..))
 
 -- | Cabal component root filepath. The module names should be
 --   resolved using this filepath as root.

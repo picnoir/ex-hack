@@ -4,27 +4,43 @@ module ExHack.Cabal.CabalParser (
   runParseResult
 ) where
 
-import Data.Text.Encoding (encodeUtf8)
-import Data.Maybe (maybeToList)
-import Data.Set (Set, fromList)
-import qualified Data.Set as S (filter)
-import Distribution.Types.CondTree (condTreeConstraints, condTreeData)
-import Distribution.Types.GenericPackageDescription (condExecutables, condSubLibraries,
-                                                     condTestSuites, condBenchmarks,
-                                                     condLibrary, packageDescription)
-import qualified Distribution.Types.Library as Lib (exposedModules, explicitLibModules)                                                     
-import Distribution.Types.Benchmark (Benchmark, benchmarkModules, benchmarkBuildInfo)
-import Distribution.Types.BuildInfo (hsSourceDirs)
-import Distribution.Types.Executable (Executable, exeModules, buildInfo)
-import Distribution.Types.Library (Library, libBuildInfo)                                                     
-import Distribution.Types.TestSuite (TestSuite, testModules, testBuildInfo)
-import Distribution.Types.PackageDescription (package)
-import Distribution.PackageDescription.Parsec (ParseResult, runParseResult,
-                                               parseGenericPackageDescription)
-import Distribution.Types.Dependency (Dependency, depPkgName) 
+import           Data.Maybe                                   (maybeToList)
+import           Data.Set                                     (Set, fromList)
+import qualified Data.Set                                     as S (filter)
+import           Data.Text.Encoding                           (encodeUtf8)
+import           Distribution.PackageDescription.Parsec       (ParseResult, parseGenericPackageDescription,
+                                                               runParseResult)
+import           Distribution.Types.Benchmark                 (Benchmark, benchmarkBuildInfo,
+                                                               benchmarkModules)
+import           Distribution.Types.BuildInfo                 (hsSourceDirs)
+import           Distribution.Types.CondTree                  (condTreeConstraints,
+                                                               condTreeData)
+import           Distribution.Types.Dependency                (Dependency,
+                                                               depPkgName)
+import           Distribution.Types.Executable                (Executable,
+                                                               buildInfo,
+                                                               exeModules)
+import           Distribution.Types.GenericPackageDescription (condBenchmarks,
+                                                               condExecutables,
+                                                               condLibrary,
+                                                               condSubLibraries,
+                                                               condTestSuites,
+                                                               packageDescription)
+import           Distribution.Types.Library                   (Library,
+                                                               libBuildInfo)
+import qualified Distribution.Types.Library                   as Lib (explicitLibModules,
+                                                                      exposedModules)
+import           Distribution.Types.PackageDescription        (package)
+import           Distribution.Types.TestSuite                 (TestSuite,
+                                                               testBuildInfo,
+                                                               testModules)
 
-import ExHack.Types (Package(..), TarballDesc(..), PackageName,
-                     PackageComponent(..), ComponentRoot(..), pkgName)
+import           ExHack.Types                                 (ComponentRoot (..),
+                                                               Package (..),
+                                                               PackageComponent (..),
+                                                               PackageName,
+                                                               TarballDesc (..),
+                                                               pkgName)
 
 getSuccParse :: [ParseResult Package] -> [Package]
 getSuccParse = foldr appendParseResult [] 

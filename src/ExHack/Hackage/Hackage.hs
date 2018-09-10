@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module ExHack.Hackage.Hackage (
     unpackHackageTarball,
@@ -9,22 +9,27 @@ module ExHack.Hackage.Hackage (
     PackageExports(..)
 ) where
 
-import Data.List (isSuffixOf)
-import qualified Data.Text.IO as T (readFile)
-import Control.Monad.Catch (MonadThrow)
-import Codec.Compression.GZip (decompress)
-import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import qualified Data.ByteString as BS (ByteString)
-import qualified Data.ByteString.Lazy as BL (fromStrict)
-import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory)
-import System.FilePath (FilePath, (</>))
+import qualified Codec.Archive.Tar      as Tar (Entries (..), entryPath, read,
+                                                unpack)
+import           Codec.Compression.GZip (decompress)
+import           Control.Monad.Catch    (MonadThrow)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import qualified Data.ByteString        as BS (ByteString)
+import qualified Data.ByteString.Lazy   as BL (fromStrict)
+import           Data.List              (isSuffixOf)
+import qualified Data.Text.IO           as T (readFile)
+import           System.Directory       (listDirectory, makeAbsolute,
+                                         withCurrentDirectory)
+import           System.FilePath        (FilePath, (</>))
 
-import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
-import ExHack.ModulePaths (findComponentRoot)
-import ExHack.Types (PackageComponent(..), Package(exposedModules), 
-                     TarballDesc(..), PackageExports(..), ComponentRoot(..),
-                     PackageFilePath(..), ModuleName)
+import           ExHack.Ghc             (DesugaredModule, getDesugaredMod,
+                                         getModExports)
+import           ExHack.ModulePaths     (findComponentRoot)
+import           ExHack.Types           (ComponentRoot (..), ModuleName,
+                                         Package (exposedModules),
+                                         PackageComponent (..),
+                                         PackageExports (..),
+                                         PackageFilePath (..), TarballDesc (..))
 
 -- | Unpack a tarball to a specified directory.
 unpackHackageTarball :: (MonadIO m) => 
