@@ -15,6 +15,7 @@ module ExHack.Types (
     ComponentRoot(..),
     PackageComponent(..),
     Package(..),
+    PackageLoadError(..),
     PackageIdentifier(..),
     PackageFilePath(..),
     PackageName,
@@ -39,7 +40,6 @@ module ExHack.Types (
     ImportsScope,
     MonadStep,
     Step,
-    ModuleFileError(..),
     SourceCodeFile(..),
     tarballsDir,
     cabalFilesDir,
@@ -50,6 +50,7 @@ module ExHack.Types (
     getName,
     getModName,
     getModNameT,
+    getPackageNameT,
     depsNames,
     packagedlDescName,
     fromComponents
@@ -249,9 +250,12 @@ getModName x = intercalate "." (pack <$> components x)
 getModNameT :: ModuleName -> ModuleNameT
 getModNameT x = ModuleNameT $ intercalate "." (pack <$> components x)
 
+getPackageNameT :: Package -> PackageNameT
+getPackageNameT = undefined
+
 -- Exceptions
 -- =================
 
-data ModuleFileError = CannotFindModuleFile String
-    deriving (Show, Eq)
-instance Exception ModuleFileError
+data PackageLoadError = CannotFindModuleFile ModuleName [ComponentRoot]
+    deriving (Show)
+instance Exception PackageLoadError

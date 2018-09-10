@@ -16,13 +16,12 @@ module ExHack.ProcessingSteps (
 ) where
 
 import Control.Lens (view)
-import Control.Monad (filterM)
-import Control.Monad.Catch (throwM, MonadCatch, MonadThrow)
+import Control.Monad.Catch (MonadCatch, MonadThrow)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader.Class (asks)
 import qualified Data.ByteString.Lazy as BL (writeFile)
 import qualified Data.ByteString as BS (readFile)
-import Data.Maybe (fromJust, listToMaybe)
+import Data.Maybe (fromJust)
 import qualified Data.HashMap.Strict as HM (HashMap, filterWithKey, empty, elems,
                                             insert, lookup)
 import qualified Data.HashSet as HS (unions, foldl')
@@ -31,13 +30,17 @@ import qualified Data.Text as T (unpack, pack)
 import qualified Data.Text.IO as T (readFile)
 import Database.Selda (SeldaM)
 import Database.Selda.SQLite (withSQLite)
-import Distribution.ModuleName (toFilePath)
-import System.Directory (doesFileExist)
+import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
+                            newManager, Manager, httpLbs,
+                            parseRequest_, responseBody)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 import ExHack.Cabal.CabalParser (parseCabalFile, getSuccParse)
 import ExHack.Ghc (getModImports, getModSymbols, unLoc)
 import ExHack.Utils (Has(..))
-import ExHack.Hackage.Hackage (unpackHackageTarball, getPackageExports)
+import ExHack.Hackage.Hackage (unpackHackageTarball, getPackageExports,
+                               findComponentRoot)
+import ExHack.ModulePaths (toModFilePath)
 import ExHack.Stackage.StackageParser (getHackageUrls,
                                        parseStackageYaml)
 import ExHack.Types (MonadStep, DatabaseHandle,
@@ -48,14 +51,11 @@ import ExHack.Types (MonadStep, DatabaseHandle,
                      PackageExports(..), WorkDir(..),
                      MonadLog(..), ImportsScope, PackageComponent(..), ModuleName,
                      ComponentRoot(..), PackageFilePath(..), IndexedModuleNameT(..),
-                     LocatedSym(..), UnifiedSym(..), ModuleFileError(..), 
-                     IndexedSym(..), SymName, packagedlDescName, logInfo)
+                     LocatedSym(..), UnifiedSym(..),
+                     IndexedSym(..), SymName, SourceCodeFile(..),
+                     packagedlDescName, logInfo, getModNameT, getPackageNameT)
 import ExHack.Data.Db (initDb, savePackages, savePackageDeps,
                        savePackageMods, getPkgImportScopes, saveModuleUnifiedSymbols)
-import Network.HTTP.Client (managerSetProxy, proxyEnvironment,
-                            newManager, Manager, httpLbs,
-                            parseRequest_, responseBody)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
 
 -- general TODO: properly catch database exceptions
 
@@ -199,24 +199,29 @@ indexSymbols pkgs = do
         indexModule dbh p pfp is `mapM_` mfps
     indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
-    indexModule dbh p (PackageFilePath pfp) is (mn,cr) = do
-        imports <- getModImports pfp cr mn 
+    indexModule dbh p pfp@(PackageFilePath pfps) is (mn,cr) = do
+        imports <- getModImports pfps cr mn 
         -- fis: filtered import scope according to this module imports
         -- isyms: imported symbols hashmap on which we will perform the unification
         let !fis = HM.filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
             !isyms = HS.unions $ HM.elems fis
             !isymsMap = HS.foldl' (\hm is'@(IndexedSym (n, _)) -> HM.insert n is' hm) HM.empty isyms 
-        syms <- getModSymbols p pfp cr mn
-        let !unsyms = unifySymbols isymsMap syms
-            -- TODO: Move file searching from GHC to somewhere I can access from here.
-            file = undefined
+        syms <- getModSymbols p pfps cr mn
+        fileContent <- liftIO $ T.readFile $ toModFilePath pfp cr mn
+        let !file = SourceCodeFile fileContent (getModNameT mn) (getPackageNameT p)
+            !unsyms = unifySymbols isymsMap syms
         withSQLite dbh $ saveModuleUnifiedSymbols unsyms file 
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
     findModuleFilePath (PackageFilePath pfp) crs mn = do
+        let !rcrs = (\(ComponentRoot cr') -> ComponentRoot (pfp <> cr')) <$> crs
+        cr <- findComponentRoot rcrs mn
+        pure (mn, cr)
+    {-do
         mcr <- listToMaybe <$> filterM testCr crs 
         maybe (throwM $ CannotFindModuleFile $ show mn) (\cr -> pure (mn, cr)) mcr
       where
         testCr (ComponentRoot cr) = liftIO $ doesFileExist $ pfp <> cr <> toFilePath mn
+        -}
     unifySymbols :: HM.HashMap SymName IndexedSym -> [LocatedSym] -> [UnifiedSym]
     unifySymbols isyms = foldl' foldLSym []
       where

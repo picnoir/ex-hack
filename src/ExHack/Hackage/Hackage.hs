@@ -5,31 +5,26 @@ module ExHack.Hackage.Hackage (
     loadExposedModules,
     getTarballDesc,
     getPackageExports,
+    findComponentRoot,
     PackageExports(..)
 ) where
 
 import Data.List (isSuffixOf)
 import qualified Data.Text.IO as T (readFile)
-import Distribution.ModuleName (ModuleName, toFilePath)
-import Control.Monad (filterM)
-import Control.Monad.Catch (Exception, MonadThrow, throwM)
+import Control.Monad.Catch (MonadThrow)
 import Codec.Compression.GZip (decompress)
 import qualified Codec.Archive.Tar as Tar (Entries(..), unpack, read, entryPath)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as BS (ByteString)
 import qualified Data.ByteString.Lazy as BL (fromStrict)
-import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory,
-                         doesPathExist)
+import System.Directory (listDirectory, makeAbsolute, withCurrentDirectory)
 import System.FilePath (FilePath, (</>))
 
 import ExHack.Ghc (DesugaredModule, getDesugaredMod, getModExports)
+import ExHack.ModulePaths (findComponentRoot)
 import ExHack.Types (PackageComponent(..), Package(exposedModules), 
                      TarballDesc(..), PackageExports(..), ComponentRoot(..),
-                     PackageFilePath(..))
-
-data PackageLoadError = CannotFindModuleFile ModuleName [ComponentRoot]
-    deriving (Show)
-instance Exception PackageLoadError
+                     PackageFilePath(..), ModuleName)
 
 -- | Unpack a tarball to a specified directory.
 unpackHackageTarball :: (MonadIO m) => 
@@ -81,14 +76,5 @@ loadExposedModules pfp p = loadModule pfp croots `mapM` maybe mempty mods exMods
 
 loadModule :: forall m. (MonadIO m, MonadThrow m) => FilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
 loadModule pfp croots mn = do
-    cr <- findComponentRoot 
+    cr <- findComponentRoot croots mn
     getDesugaredMod pfp cr mn >>= \m -> pure (mn,m)
-  where
-    testPath :: ComponentRoot -> m Bool
-    testPath (ComponentRoot p) = liftIO $ doesPathExist (p <> toFilePath mn <> ".hs")  
-    findComponentRoot :: m ComponentRoot  
-    findComponentRoot = do
-        xs <- filterM testPath (ComponentRoot "./" : croots)
-        if length xs == 1
-           then pure $ head xs
-           else throwM $ CannotFindModuleFile mn croots

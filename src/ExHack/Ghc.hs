@@ -13,12 +13,11 @@ module ExHack.Ghc (
   unLoc
   ) where
 
-import Data.List (intercalate)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad (when)
 import Data.Maybe (isNothing, fromMaybe)
 import Data.Text (pack)
-import Distribution.ModuleName (ModuleName, components, toFilePath)
+import Distribution.ModuleName (ModuleName, toFilePath)
 import qualified Distribution.Helper as H (mkQueryEnv, runQuery, 
                                            ghcOptions, components, 
                                            ChComponentName(ChLibName))
@@ -45,6 +44,7 @@ import Avail (AvailInfo(..))
 import Name (getOccString)
 import Lexer (Token(ITqvarid, ITvarid))
 
+import ExHack.ModulePaths (modName)
 import ExHack.Types (SymName(..), ComponentRoot(..), 
                      ModuleNameT(..), LocatedSym(..),
                      Package(..))
@@ -62,12 +62,11 @@ getModImports pfp cr mn =
 getModSymbols :: (MonadIO m) => Package -> FilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
 getModSymbols p pfp cr@(ComponentRoot crs) mn =
     withGhcEnv pfp cr mn $ do
-        m <- findModule (mkModuleName modName) Nothing 
+        m <- findModule (mkModuleName $ modName mn) Nothing 
         ts <- getTokenStream m
         let sns = (SymName . pack . unpackFS . getTNames) <$$> filter filterTokenTypes ts
         pure $ (\sn -> LocatedSym (p, fileName, sn)) <$> sns 
         where
-            modName = intercalate "." $ components mn
             filterTokenTypes (L _ (ITqvarid _)) = True   
             filterTokenTypes (L _ (ITvarid _)) = True   
             filterTokenTypes _ = False
@@ -121,6 +120,4 @@ withGhcEnv pfp (ComponentRoot cr) mn a = do
 
 onModSum :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> (ModSummary -> Ghc a) -> m a
 onModSum pfp cr mn f = withGhcEnv pfp cr mn 
-                        (getModSummary (mkModuleName modName) >>= f)
-    where
-        modName = intercalate "." $ components mn 
+                        (getModSummary (mkModuleName $ modName mn) >>= f)
