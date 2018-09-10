@@ -1,0 +1,5 @@
+    db-file:         /path/to/db.db
+    stackage-file:   /path/to/stackage.yaml
+    tarballs-dir:    /path/to/tarball/dir/
+    cabal-files-dir: /path/to/cabal/dir/
+    work-dir:        /path/to/work/dir

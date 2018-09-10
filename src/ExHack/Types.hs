@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module ExHack.Types (
+    newDatabaseHandle,
     Config(..),
     ComponentRoot(..),
     PackageComponent(..),
@@ -53,7 +54,8 @@ module ExHack.Types (
     getPackageNameT,
     depsNames,
     packagedlDescName,
-    fromComponents
+    fromComponents,
+    parseConfig
 ) where
 
 import           Prelude                        hiding (length, replicate)
@@ -72,6 +74,7 @@ import           Data.String                    (IsString)
 import           Data.Text                      (Text, intercalate, length,
                                                  pack, replicate)
 import qualified Data.Text.IO                   as TIO (hPutStrLn, putStrLn)
+import           Data.Yaml                      (FromJSON (..), ParseException(..), decodeFileEither, (.:), withObject)
 import           Database.Selda                 (RowID, SeldaM)
 import           Distribution.ModuleName        (ModuleName (..), components,
                                                  fromComponents)
@@ -108,15 +111,18 @@ data Package = Package {
   allModules :: [PackageComponent]
 } deriving (Eq, Show)
 
-type DatabaseHandle (a :: DatabaseStatus) = FilePath
 
-newtype TarballsDir = TarballsDir FilePath
-newtype CabalFilesDir = CabalFilesDir FilePath
-newtype WorkDir = WorkDir FilePath
+newtype TarballsDir = TarballsDir FilePath deriving (Eq, Show)
+newtype CabalFilesDir = CabalFilesDir FilePath deriving (Eq, Show)
+newtype WorkDir = WorkDir FilePath deriving (Eq, Show)
 
 data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
+type DatabaseHandle (a :: DatabaseStatus) = FilePath
 
-newtype StackageFile = StackageFile Text
+newDatabaseHandle :: FilePath -> DatabaseHandle 'New
+newDatabaseHandle = id
+
+newtype StackageFile = StackageFile Text deriving (Eq, Show)
 
 data Config a = Config {
     _dbHandle :: DatabaseHandle a,
@@ -124,8 +130,18 @@ data Config a = Config {
     _tarballsDir :: TarballsDir,
     _cabalFilesDir :: CabalFilesDir,
     _workDir :: WorkDir
-}
+} deriving (Eq, Show)
 
+instance FromJSON (Config 'New) where
+    parseJSON = withObject "config" $ \v -> Config 
+        <$> (newDatabaseHandle <$> (v .: "db-file"))
+        <*> (StackageFile <$> v .: "stackage-file")
+        <*> (TarballsDir <$> v .: "tarballs-dir")
+        <*> (CabalFilesDir <$> v .: "cabal-files-dir")
+        <*> (WorkDir <$> v .: "work-dir")
+
+parseConfig :: FilePath -> IO (Either ParseException (Config 'New))
+parseConfig = decodeFileEither
 
 makeLenses ''Config
 
