@@ -11,7 +11,6 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module ExHack.Types (
-    newDatabaseHandle,
     Config(..),
     ComponentRoot(..),
     PackageComponent(..),
@@ -55,7 +54,8 @@ module ExHack.Types (
     depsNames,
     packagedlDescName,
     fromComponents,
-    parseConfig
+    parseConfig,
+    newDatabaseHandle
 ) where
 
 import           Prelude                        hiding (length, replicate)
@@ -209,8 +209,8 @@ newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
 data SourceCodeFile = SourceCodeFile Text ModuleNameT PackageNameT
 
 class (Monad m) => MonadLog m where
-    logInfo, logError, logTitle :: Text -> m ()
-    logTitle txt = line >> logInfo ("* " <> txt <> " *") >> line
+    logInfo, logError, logInfoTitle :: Text -> m ()
+    logInfoTitle txt = line >> logInfo ("* " <> txt <> " *") >> line
         where 
             line :: m ()
             !line = logInfo (replicate (length txt + 4) "*")

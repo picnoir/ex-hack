@@ -3,9 +3,11 @@ module ExHack.ConfigSpec (
     spec 
 ) where
 
-import           Test.Hspec   (Spec, describe, it, shouldBe, expectationFailure)
+import           Test.Hspec   (Spec, describe, expectationFailure, it, shouldBe)
 
-import           ExHack.Types (parseConfig, Config(..), StackageFile(..), newDatabaseHandle, TarballsDir(..), CabalFilesDir(..), WorkDir(..))
+import           ExHack.Types (CabalFilesDir (..), Config (..),
+                               StackageFile (..), TarballsDir (..),
+                               WorkDir (..), newDatabaseHandle, parseConfig)
 
 
 spec :: Spec

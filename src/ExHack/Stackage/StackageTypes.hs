@@ -6,11 +6,11 @@ module ExHack.Stackage.StackageTypes (
   Packages(..)
 ) where
 
-import           Data.Aeson                     (FromJSON (..), withObject,
-                                                 (.!=), (.:), (.:?))
 import qualified Data.Map                       as Map
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
+import           Data.Yaml                      (FromJSON (..), withObject,
+                                                 (.!=), (.:), (.:?))
 import           Distribution.Types.PackageName (PackageName)
 import qualified Distribution.Types.PackageName as C (mkPackageName)
 

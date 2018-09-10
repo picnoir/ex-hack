@@ -28,43 +28,41 @@ library
   hs-source-dirs:
       src
   build-depends:
-      aeson >= 1.3,
-      base >=4.7 && <5,
-      bytestring,
-      Cabal,
-      cabal-helper >=0.8.1,
-      hashable,
-      unordered-containers,
-      containers,
-      directory,
-      exceptions,
-      ghc,
-      ghc-paths,
-      http-client,
-      http-client-tls,
-      filepath,
-      lens,
-      mtl,
-      process,
-      tar,
-      text,
-      yaml,
-      safe,
+      base >=4.11,
+      bytestring >= 0.10,
+      Cabal >= 2.2,
+      cabal-helper >= 0.8.1,
+      containers >= 0.5,
+      directory >= 1.3,
+      exceptions >= 0.10,
+      filepath >= 1.4.2,
+      ghc >= 8.4.3,
+      ghc-paths >= 0.1,
+      hashable >= 1.2,
+      http-client >= 0.5,
+      http-client-tls >= 0.3,
+      lens >= 4.17,
+      mtl >= 2.2,
+      process >= 1.6,
+      safe >= 0.3,
       selda >= 0.2 && <0.3,
-      transformers,
-      selda-sqlite,
-      zlib
+      selda-sqlite >= 0.1,
+      tar >= 0.5,
+      text >= 1.2,
+      unordered-containers >= 0.2,
+      yaml >= 0.8,
+      zlib >= 0.6
   exposed-modules:
-      ExHack.Ghc,
-      ExHack.ModulePaths,
-      ExHack.Hackage.Hackage,
-      ExHack.Stackage.StackageTypes,
-      ExHack.Stackage.StackageParser,
       ExHack.Cabal.Cabal,
       ExHack.Cabal.CabalParser,
-      ExHack.ProcessingSteps,
-      ExHack.Types,
       ExHack.Data.Db,
+      ExHack.Ghc,
+      ExHack.Hackage.Hackage,
+      ExHack.ModulePaths,
+      ExHack.ProcessingSteps,
+      ExHack.Stackage.StackageParser,
+      ExHack.Stackage.StackageTypes,
+      ExHack.Types,
       ExHack.Utils
   default-language: Haskell2010
   ghc-options: -Wall -O2 
@@ -75,15 +73,9 @@ executable ex-hack
       app
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >= 4.11 && <5
-    , bytestring
-    , directory
-    , ex-hack
-    , lens
-    , mtl
-    , text
-    , selda >= 0.2 && <0.3
-    , selda-sqlite
+      base >= 4.11 && <5,
+      ex-hack,
+      text >= 1.2
   other-modules:
     Cli
   default-language: Haskell2010
@@ -95,17 +87,17 @@ test-suite unit-tests
       test/unit
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.11 && <5
-    , ex-hack
-    , hspec
-    , file-embed >= 0.0.10
-    , containers
-    , text
+      base >=4.11 && <5,
+      containers,
+      ex-hack,
+      file-embed >= 0.0.10,
+      hspec,
+      text
   other-modules:
-      ExHack.StackageSpec,
       ExHack.CabalSpec,
+      ExHack.ConfigSpec,
       ExHack.ModulePathSpec,
-      ExHack.ConfigSpec
+      ExHack.StackageSpec
   default-language: Haskell2010
 
 test-suite integration-tests

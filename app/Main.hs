@@ -1,5 +1,5 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DataKinds #-}
 
 module Main where
 
@@ -13,7 +13,7 @@ import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
 import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseStatus (..), StackageFile (..),
                                          TarballsDir (..), WorkDir (..),
-                                         logTitle, runStep)
+                                         logInfoTitle, runStep)
 
 type PreCondition = IO Bool
 
@@ -27,14 +27,14 @@ initConf = do
 
 main :: IO ()
 main = do
-    logTitle "[+] STEP 0: Initializing database"
+    logInfoTitle "[+] STEP 0: Initializing database"
     c <- initConf
     dbInit <- runStep generateDb c
     let ci = c {_dbHandle= dbInit} :: Config 'Initialized
-    logTitle "[+] STEP 1: Parsing stackage LTS-10.5"
+    logInfoTitle "[+] STEP 1: Parsing stackage LTS-10.5"
     descs <- runStep parseStackage ci
-    logTitle "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)"
+    logInfoTitle "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)"
     runStep (dlAssets descs) ci 
-    logTitle "[+] STEP 3: Generating dependancy graph"
+    logInfoTitle "[+] STEP 3: Generating dependancy graph"
     pgks <- runStep (genGraphDep descs) ci
     pure ()
