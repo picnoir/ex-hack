@@ -12,6 +12,7 @@ import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.List               (intercalate)
 import           Distribution.ModuleName (ModuleName, components, toFilePath)
 import           System.Directory        (doesPathExist)
+import           System.FilePath         ((<.>), (</>))
 
 import           ExHack.Types            (ComponentRoot (..),
                                           PackageFilePath (..),
@@ -22,7 +23,7 @@ modName mn = intercalate "." $ components mn
 
 toModFilePath :: PackageFilePath -> ComponentRoot -> ModuleName -> FilePath
 toModFilePath (PackageFilePath pfp) (ComponentRoot cr) mn = 
-    pfp <> cr <> toFilePath mn <> ".hs"
+    pfp </> cr </> toFilePath mn <> ".hs"
 
 findComponentRoot :: (MonadIO m, MonadThrow m) => [ComponentRoot] -> ModuleName -> m ComponentRoot  
 findComponentRoot croots mn = do
@@ -31,4 +32,4 @@ findComponentRoot croots mn = do
        then pure $ head xs
        else throwM $ CannotFindModuleFile mn croots
   where
-    testPath (ComponentRoot p) = liftIO $ doesPathExist (p <> toFilePath mn <> ".hs")  
+    testPath (ComponentRoot p) = liftIO $ doesPathExist (p <> toFilePath mn <.> "hs")  

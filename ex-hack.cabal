@@ -103,7 +103,8 @@ test-suite unit-tests
     , text
   other-modules:
       ExHack.StackageSpec,
-      ExHack.CabalSpec
+      ExHack.CabalSpec,
+      ExHack.ModulePathSpec
   default-language: Haskell2010
 
 test-suite integration-tests
