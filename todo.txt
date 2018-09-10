@@ -1,5 +1,0 @@
-TODO Tech Debt:
-
-- Extract config from source code.
-- Think about a proper way to config e2e tests.
-- Review CHDIR sequence, seems fishy.
