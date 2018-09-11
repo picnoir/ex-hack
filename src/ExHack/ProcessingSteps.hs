@@ -15,8 +15,9 @@ module ExHack.ProcessingSteps (
 ) where
 
 import           Control.Lens                   (view)
-import           Control.Monad                  (foldM_)
-import           Control.Monad.Catch            (MonadCatch, MonadThrow)
+import           Control.Monad                  (foldM, foldM_)
+import           Control.Monad.Catch            (MonadCatch, MonadThrow,
+                                                 displayException, handleAll)
 import           Control.Monad.IO.Class         (liftIO)
 import           Control.Monad.Reader.Class     (asks)
 import qualified Data.ByteString                as BS (readFile)
@@ -27,7 +28,7 @@ import qualified Data.HashMap.Strict            as HM (HashMap, elems, empty,
 import qualified Data.HashSet                   as HS (foldl', unions)
 import           Data.List                      (foldl')
 import           Data.Maybe                     (fromJust)
-import qualified Data.Text                      as T (unpack)
+import qualified Data.Text                      as T (pack, unpack)
 import qualified Data.Text.IO                   as T (readFile)
 import           Database.Selda                 (SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
@@ -58,6 +59,7 @@ import           ExHack.Types                   (CabalFilesDir (..),
                                                  IndexedModuleNameT (..),
                                                  IndexedSym (..),
                                                  LocatedSym (..), ModuleName,
+                                                 ModuleNameT (..),
                                                  MonadLog (..), MonadStep,
                                                  Package (allModules, tarballPath),
                                                  PackageComponent (..),
@@ -74,8 +76,6 @@ import           ExHack.Types                   (CabalFilesDir (..),
                                                  getPackageNameT, logInfo,
                                                  packagedlDescName)
 import           ExHack.Utils                   (Has (..))
-
--- general TODO: properly catch database exceptions
 
 generateDb :: forall c m. 
     (Has c (DatabaseHandle 'New), 
@@ -114,12 +114,18 @@ dlAssets packages = do
     return ()
   where
     dlFoldCabalFiles :: CabalFilesDir -> TarballsDir -> Manager -> Int -> PackageDlDesc -> m Int -> m Int
-    dlFoldCabalFiles !cd !td man totalSteps !p step = do 
+    dlFoldCabalFiles !cd !td man totalSteps !p step = handleAll logErrors $ do 
         step' <- step
         let !pn = packagedlDescName p
-        downloadHackageFiles cd td man p
         logInfoProgress 3 totalSteps step' $ "Downloading " <> pn <> " assets."
+        downloadHackageFiles cd td man p
         return $ step' + 1
+      where
+        logErrors e = do
+            logError $ "[Step 3] ERROR while downloading " <> packagedlDescName p 
+                        <> " assets: " <> T.pack (displayException e)
+            step' <- step
+            pure (step' + 1)
     downloadHackageFiles :: CabalFilesDir -> TarballsDir -> Manager -> PackageDlDesc -> m ()
     downloadHackageFiles 
       (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) man 
@@ -143,7 +149,7 @@ genGraphDep pd = do
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
     logInfo "[+] Parsing cabal files."
-    pkgs <- readPkgsFiles cd tbd `mapM` pd
+    (_,pkgs) <- foldM (readPkgsFiles cd tbd (length pd)) (1,[]) pd
     let pkgs' = getSuccParse (parseCabalFile <$> pkgs)
     -- 2
     liftIO $ withSQLite dbHandle $ do
@@ -152,22 +158,35 @@ genGraphDep pd = do
         logInfo "[+] Done."
         -- 3
         logInfo "[+] Saving dependancies to DB..."
-        _ <- foldr (foldInsertDep (length pkgs)) (return 1) pkgs'
+        foldM_ (foldInsertDep (length pkgs)) 1 pkgs'
         logInfo "[+] Done."
         return ()
     pure (dbHandle, pkgs')
   where
-    readPkgsFiles :: CabalFilesDir -> TarballsDir -> PackageDlDesc -> m TarballDesc
-    readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) p = do
-        let tp = tarballsDir <> T.unpack (packagedlDescName p) <> ".tar.gz"
-        cf <- liftIO $ T.readFile $ cabalFilesDir <> T.unpack (packagedlDescName p) <> ".cabal"
-        pure $ TarballDesc (tp,cf)
-    foldInsertDep :: Int -> Package -> SeldaM Int -> SeldaM Int
-    foldInsertDep totalDeps pkg step = do 
-      step' <- step
-      savePackageDeps pkg
-      logInfoProgress 4 totalDeps step' $ "Saving " <> getName pkg <> " dependancies to DB."
-      return $ step' + 1
+    readPkgsFiles :: CabalFilesDir -> TarballsDir -> Int -> (Int, [TarballDesc])
+                  -> PackageDlDesc -> m (Int, [TarballDesc])
+    readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) !totalSteps (!step, xs) p = 
+        handleAll logErrors $ do
+            logInfoProgress 5 totalSteps step $ "Reading" <> packagedlDescName p <> " cabal file."
+            let tp = tarballsDir <> T.unpack (packagedlDescName p) <> ".tar.gz"
+            cf <- liftIO $ T.readFile $ cabalFilesDir <> T.unpack (packagedlDescName p) <> ".cabal"
+            pure (step + 1, TarballDesc (tp,cf) : xs)
+      where
+        logErrors e = do
+            logError $ "[Step 4] ERROR cannot read " <> packagedlDescName p
+                       <> " cabal file: " <> T.pack (displayException e)
+            pure (step + 1, xs)
+    foldInsertDep :: Int -> Int -> Package -> SeldaM Int
+    foldInsertDep totalDeps step pkg = handleAll logErrors $ do 
+        savePackageDeps pkg
+        logInfoProgress 4 totalDeps step $ "Saving " <> getName pkg <> " dependancies to DB."
+        pure $ step + 1
+      where
+        logErrors e = do
+            logError $ "[Step 4] ERROR cannot insert " <> getName pkg <> " dependancies to DB: "
+                <> T.pack (displayException e)
+            pure $ step + 1
+
 
 retrievePkgsExports :: forall c m.
     (Has c WorkDir,
@@ -178,21 +197,36 @@ retrievePkgsExports pkgs = do
     logInfoTitle "[Step 5] Retrieving package exports."
     dbHandle <- asks (view hasLens)
     wd <- asks (view hasLens) 
-    (_, pkgsExports) <- foldl' (getPkgExports (length pkgs) wd) (pure (1, [])) pkgs
+    (_, pkgsExports) <- foldM (getPkgExports (length pkgs) wd) (1, []) pkgs
     logInfo "[Step 5] Saving package exports to database."
-    let seldaActions = savePackageMods `mapM` pkgsExports
-    _ <- liftIO $ withSQLite dbHandle seldaActions
+    _ <- liftIO $ withSQLite dbHandle $
+            foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
     pure (dbHandle, pkgsExports)
   where
-    -- TODO think about error handling here.
-    getPkgExports :: Int -> WorkDir -> m (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
-    getPkgExports totalSteps (WorkDir wd) acc p = do
-        (!nb, xs) <- acc
+    savePackageModsLogProgress :: Int -> Int -> PackageExports -> SeldaM Int 
+    savePackageModsLogProgress !totalSteps !step pe@(PackageExports (p,_,_)) = 
+        handleAll logErrors $ do
+            logInfoProgress 5 totalSteps step $ "Saving " <> getName p <> " exports to database."
+            savePackageMods pe
+            pure $ step + 1
+      where
+        logErrors e = do
+            logError $ "[Step 5] ERROR cannot save exports of " <> getName p 
+                        <> " in database: " <> T.pack (displayException e)
+            pure $ step + 1
+    getPkgExports :: Int -> WorkDir -> (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
+    getPkgExports totalSteps (WorkDir wd) (!nb, xs) p = handleAll logErrors $ do
         logInfoProgress 5 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
         tb <- liftIO . BS.readFile $ tarballPath p
         tbp <- unpackHackageTarball wd tb
         x <- getPackageExports tbp p
         pure (nb + 1,  x : xs)
+      where
+        logErrors e = do
+            logError $ "[Step 5] ERROR cannot get exports for " <> getName p <> ": " 
+                     <> T.pack (displayException e)
+            pure (nb + 1, xs)
+            
 
 -- | Indexes the code source symbols in the database.
 --
@@ -227,7 +261,7 @@ indexSymbols pkgs = do
         indexModule dbh p pfp is `mapM_` mfps
     indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
-    indexModule dbh p pfp@(PackageFilePath pfps) is (mn,cr) = do
+    indexModule dbh p pfp@(PackageFilePath pfps) is (mn,cr) = handleAll logErrors $ do
         imports <- getModImports pfps cr mn 
         -- fis: filtered import scope according to this module imports
         -- isyms: imported symbols hashmap on which we will perform the unification
@@ -239,6 +273,12 @@ indexSymbols pkgs = do
         let !file = SourceCodeFile fileContent (getModNameT mn) (getPackageNameT p)
             !unsyms = unifySymbols isymsMap syms
         withSQLite dbh $ saveModuleUnifiedSymbols unsyms file 
+      where
+        logErrors e = do
+            let (ModuleNameT mnt) = getModNameT mn
+            logError $ "[Step 6] ERROR while indexing module " <> mnt <> " from package "
+                     <> getName p <> ": " <> T.pack (displayException e)
+                    
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
     findModuleFilePath (PackageFilePath pfp) crs mn = do
         let !rcrs = (\(ComponentRoot cr') -> ComponentRoot (pfp <> cr')) <$> crs
