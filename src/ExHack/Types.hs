@@ -273,7 +273,7 @@ getModNameT :: ModuleName -> ModuleNameT
 getModNameT x = ModuleNameT $ intercalate "." (pack <$> components x)
 
 getPackageNameT :: Package -> PackageNameT
-getPackageNameT = undefined
+getPackageNameT p = PackageNameT (getName p)
 
 -- Exceptions
 -- =================

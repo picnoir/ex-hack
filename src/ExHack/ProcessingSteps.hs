@@ -15,6 +15,7 @@ module ExHack.ProcessingSteps (
 ) where
 
 import           Control.Lens                   (view)
+import Control.Monad (foldM_)
 import           Control.Monad.Catch            (MonadCatch, MonadThrow)
 import           Control.Monad.IO.Class         (liftIO)
 import           Control.Monad.Reader.Class     (asks)
@@ -70,6 +71,7 @@ import           ExHack.Types                   (CabalFilesDir (..),
                                                  TarballsDir (..),
                                                  UnifiedSym (..), WorkDir (..),
                                                  getModNameT, getPackageNameT,
+                                                 getName,
                                                  logInfo, packagedlDescName)
 import           ExHack.Utils                   (Has (..))
 
@@ -77,11 +79,10 @@ import           ExHack.Utils                   (Has (..))
 
 generateDb :: forall c m. 
     (Has c (DatabaseHandle 'New), 
-     MonadLog m,
      MonadStep c m) 
     => m (DatabaseHandle 'Initialized)
 generateDb = do
-    logInfo "test"
+    logInfoTitle "[Step 1] Generating database scheme."
     fp <- asks (view hasLens)
     withSQLite fp initDb
     pure fp
@@ -91,6 +92,7 @@ parseStackage :: forall c m.
      MonadStep c m)
     => m [PackageDlDesc]
 parseStackage = do
+    logInfoTitle "[Step 2] Parsing Stackage file"
     (StackageFile stackageYaml) <- asks (view hasLens)
     let packages = fromJust $ parseStackageYaml stackageYaml 
     pure $ getHackageUrls packages
@@ -101,6 +103,7 @@ dlAssets :: forall c m.
      MonadStep c m)
     => [PackageDlDesc] -> m ()
 dlAssets packages = do
+    logInfoTitle "[Step 3] Downloading hackage assets (cabal files, tarballs)."
     let settings = managerSetProxy
             (proxyEnvironment Nothing)
             tlsManagerSettings
@@ -115,7 +118,7 @@ dlAssets packages = do
         step' <- step
         let pn = packagedlDescName p
         downloadHackageFiles cd td man p
-        logInfo ("----" <> ("[" <> T.pack (show step') <> "/" <> T.pack (show totalSteps) <> "] " <> pn))
+        logInfo ("[Step 3]" <> ("[" <> T.pack (show step') <> "/" <> T.pack (show totalSteps) <> "] " <> pn))
         return $ step' + 1
     downloadHackageFiles :: CabalFilesDir -> TarballsDir -> Manager -> PackageDlDesc -> m ()
     downloadHackageFiles 
@@ -135,6 +138,7 @@ genGraphDep :: forall c m.
      MonadStep c m)
     => [PackageDlDesc] -> m (DatabaseHandle 'DepsGraph, [Package])
 genGraphDep pd = do
+    logInfoTitle "[Step 4] Generating dependencies graph."
     dbHandle <- asks (view hasLens)
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
@@ -162,8 +166,8 @@ genGraphDep pd = do
     foldInsertDep totalDeps pkg step = do 
       step' <- step
       savePackageDeps pkg
-      logInfo $ "----" <> "[" <> T.pack (show step') <> "/" <> T.pack (show totalDeps) 
-                <> "] " <> T.pack (show pkg)
+      logInfo $ "[Step 4]" <> "[" <> T.pack (show step') <> "/" <> T.pack (show totalDeps) 
+                <> "] Saving " <> getName pkg <> " dependancies to DB."
       return $ step' + 1
 
 retrievePkgsExports :: forall c m.
@@ -172,19 +176,26 @@ retrievePkgsExports :: forall c m.
      MonadStep c m)
    => [Package] -> m (DatabaseHandle 'PkgExports, [PackageExports])
 retrievePkgsExports pkgs = do
+    logInfoTitle "[Step 5] Retrieving package exports."
     dbHandle <- asks (view hasLens)
     wd <- asks (view hasLens) 
-    pkgsExports <- getPkgExports wd `mapM` pkgs
+    (_, pkgsExports) <- foldl' (getPkgExports (length pkgs) wd) (pure (1, [])) pkgs
+    logInfo "[Step 5] Saving package exports to database."
     let seldaActions = savePackageMods `mapM` pkgsExports
     _ <- liftIO $ withSQLite dbHandle seldaActions
     pure (dbHandle, pkgsExports)
   where
     -- TODO think about error handling here.
-    getPkgExports :: WorkDir -> Package -> m PackageExports
-    getPkgExports (WorkDir wd) p = do
+    getPkgExports :: Int -> WorkDir -> m (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
+    getPkgExports totalSteps (WorkDir wd) acc p = do
+        (!nb, xs) <- acc
+        logInfo $ "[Step 5]" <> "[" <> T.pack (show nb) 
+                    <> "/" <> T.pack (show totalSteps) 
+                    <> "] Retrieving "<> getName p <> " exports." 
         tb <- liftIO . BS.readFile $ tarballPath p
-        tbp <- unpackHackageTarball wd tb  
-        getPackageExports tbp p
+        tbp <- unpackHackageTarball wd tb
+        x <- getPackageExports tbp p
+        pure (nb + 1,  x : xs)
 
 -- | Indexes the code source symbols in the database.
 --
@@ -202,14 +213,17 @@ indexSymbols :: forall c m.
      Has c (DatabaseHandle 'PkgExports))
   => [PackageExports] -> m ()
 indexSymbols pkgs = do
+    logInfoTitle "[Step 6] Indexing used symbols."
     dbh <- asks (view hasLens)
-    indexPackage dbh `mapM_` pkgs 
+    foldM_ (indexPackage dbh (length pkgs)) 1 pkgs 
   where
-    indexPackage :: DatabaseHandle 'PkgExports -> PackageExports -> m ()
-    indexPackage !dbh (PackageExports (p, pfp, _)) = do
+    indexPackage :: DatabaseHandle 'PkgExports -> Int -> Int -> PackageExports -> m Int 
+    indexPackage !dbh nb cur (PackageExports (p, pfp, _)) = do
+        logInfo $ "[Step 6][" <> T.pack (show cur) <> "/" <> T.pack (show nb)
+                    <> "] Indexing " <> getName p <> " used symbols."
         is <- liftIO $ withSQLite dbh $ getPkgImportScopes p
         indexComponent dbh p pfp is `mapM_` allModules p 
-        pure ()
+        pure $ cur + 1
     indexComponent :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                    -> PackageComponent -> m ()
     indexComponent dbh p pfp is pc = do
@@ -234,12 +248,6 @@ indexSymbols pkgs = do
         let !rcrs = (\(ComponentRoot cr') -> ComponentRoot (pfp <> cr')) <$> crs
         cr <- findComponentRoot rcrs mn
         pure (mn, cr)
-    {-do
-        mcr <- listToMaybe <$> filterM testCr crs 
-        maybe (throwM $ CannotFindModuleFile $ show mn) (\cr -> pure (mn, cr)) mcr
-      where
-        testCr (ComponentRoot cr) = liftIO $ doesFileExist $ pfp <> cr <> toFilePath mn
-        -}
     unifySymbols :: HM.HashMap SymName IndexedSym -> [LocatedSym] -> [UnifiedSym]
     unifySymbols isyms = foldl' foldLSym []
       where

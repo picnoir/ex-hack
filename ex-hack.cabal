@@ -1,9 +1,3 @@
--- This file has been generated from package.yaml by hpack version 0.20.0.
---
--- see: https://github.com/sol/hpack
---
--- hash: e4b631a26b4bfbc48c0678702f3f9564ae0a34d348ca3e4806689dfd0838c3f1
-
 name:           ex-hack
 version:        0.1.0.0
 description:    TOFILL
