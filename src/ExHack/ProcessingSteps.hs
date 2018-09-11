@@ -15,7 +15,7 @@ module ExHack.ProcessingSteps (
 ) where
 
 import           Control.Lens                   (view)
-import Control.Monad (foldM_)
+import           Control.Monad                  (foldM_)
 import           Control.Monad.Catch            (MonadCatch, MonadThrow)
 import           Control.Monad.IO.Class         (liftIO)
 import           Control.Monad.Reader.Class     (asks)
@@ -27,7 +27,7 @@ import qualified Data.HashMap.Strict            as HM (HashMap, elems, empty,
 import qualified Data.HashSet                   as HS (foldl', unions)
 import           Data.List                      (foldl')
 import           Data.Maybe                     (fromJust)
-import qualified Data.Text                      as T (pack, unpack)
+import qualified Data.Text                      as T (unpack)
 import qualified Data.Text.IO                   as T (readFile)
 import           Database.Selda                 (SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
@@ -70,9 +70,9 @@ import           ExHack.Types                   (CabalFilesDir (..),
                                                  TarballDesc (..),
                                                  TarballsDir (..),
                                                  UnifiedSym (..), WorkDir (..),
-                                                 getModNameT, getPackageNameT,
-                                                 getName,
-                                                 logInfo, packagedlDescName)
+                                                 getModNameT, getName,
+                                                 getPackageNameT, logInfo,
+                                                 packagedlDescName)
 import           ExHack.Utils                   (Has (..))
 
 -- general TODO: properly catch database exceptions
@@ -116,9 +116,9 @@ dlAssets packages = do
     dlFoldCabalFiles :: CabalFilesDir -> TarballsDir -> Manager -> Int -> PackageDlDesc -> m Int -> m Int
     dlFoldCabalFiles !cd !td man totalSteps !p step = do 
         step' <- step
-        let pn = packagedlDescName p
+        let !pn = packagedlDescName p
         downloadHackageFiles cd td man p
-        logInfo ("[Step 3]" <> ("[" <> T.pack (show step') <> "/" <> T.pack (show totalSteps) <> "] " <> pn))
+        logInfoProgress 3 totalSteps step' $ "Downloading " <> pn <> " assets."
         return $ step' + 1
     downloadHackageFiles :: CabalFilesDir -> TarballsDir -> Manager -> PackageDlDesc -> m ()
     downloadHackageFiles 
@@ -166,8 +166,7 @@ genGraphDep pd = do
     foldInsertDep totalDeps pkg step = do 
       step' <- step
       savePackageDeps pkg
-      logInfo $ "[Step 4]" <> "[" <> T.pack (show step') <> "/" <> T.pack (show totalDeps) 
-                <> "] Saving " <> getName pkg <> " dependancies to DB."
+      logInfoProgress 4 totalDeps step' $ "Saving " <> getName pkg <> " dependancies to DB."
       return $ step' + 1
 
 retrievePkgsExports :: forall c m.
@@ -189,9 +188,7 @@ retrievePkgsExports pkgs = do
     getPkgExports :: Int -> WorkDir -> m (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
     getPkgExports totalSteps (WorkDir wd) acc p = do
         (!nb, xs) <- acc
-        logInfo $ "[Step 5]" <> "[" <> T.pack (show nb) 
-                    <> "/" <> T.pack (show totalSteps) 
-                    <> "] Retrieving "<> getName p <> " exports." 
+        logInfoProgress 5 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
         tb <- liftIO . BS.readFile $ tarballPath p
         tbp <- unpackHackageTarball wd tb
         x <- getPackageExports tbp p
@@ -219,8 +216,7 @@ indexSymbols pkgs = do
   where
     indexPackage :: DatabaseHandle 'PkgExports -> Int -> Int -> PackageExports -> m Int 
     indexPackage !dbh nb cur (PackageExports (p, pfp, _)) = do
-        logInfo $ "[Step 6][" <> T.pack (show cur) <> "/" <> T.pack (show nb)
-                    <> "] Indexing " <> getName p <> " used symbols."
+        logInfoProgress 6 nb cur $ "Indexing " <> getName p <> " used symbols."
         is <- liftIO $ withSQLite dbh $ getPkgImportScopes p
         indexComponent dbh p pfp is `mapM_` allModules p 
         pure $ cur + 1

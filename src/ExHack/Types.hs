@@ -74,7 +74,10 @@ import           Data.String                    (IsString)
 import           Data.Text                      (Text, intercalate, length,
                                                  pack, replicate)
 import qualified Data.Text.IO                   as TIO (hPutStrLn, putStrLn)
-import           Data.Yaml                      (FromJSON (..), ParseException(..), decodeFileEither, (.:), withObject)
+import           Data.Yaml                      (FromJSON (..),
+                                                 ParseException (..),
+                                                 decodeFileEither, withObject,
+                                                 (.:))
 import           Database.Selda                 (RowID, SeldaM)
 import           Distribution.ModuleName        (ModuleName (..), components,
                                                  fromComponents)
@@ -84,6 +87,10 @@ import           Distribution.Types.PackageName (PackageName, mkPackageName,
                                                  unPackageName)
 import           Distribution.Version           (mkVersion)
 import           GHC                            (GenLocated (..), SrcSpan)
+import           System.Console.ANSI            (Color (Blue, Red),
+                                                 ColorIntensity (Vivid),
+                                                 ConsoleLayer (Foreground),
+                                                 SGR (Reset, SetColor), setSGR)
 import           System.FilePath                (FilePath)
 import           System.IO                      (stderr)
 
@@ -210,22 +217,38 @@ data SourceCodeFile = SourceCodeFile Text ModuleNameT PackageNameT
 
 class (Monad m) => MonadLog m where
     logInfo, logError, logInfoTitle :: Text -> m ()
+    logInfoProgress :: Int -> Int -> Int -> Text -> m ()
+    logInfoProgress stepNb tot cur t = logInfo $ "[Step " 
+        <> pack (show stepNb) <> "][" <> pack (show cur) <> "/" 
+        <> pack (show tot) <> "] " <> t
     logInfoTitle txt = line >> logInfo ("* " <> txt <> " *") >> line
         where 
             line :: m ()
             !line = logInfo (replicate (length txt + 4) "*")
 
 instance MonadLog IO where
-    logInfo = TIO.putStrLn
-    logError = TIO.hPutStrLn stderr
+    logInfo t = setSGR [SetColor Foreground Vivid Blue] >> TIO.putStrLn t >> setSGR [Reset]
+    logError t = setSGR [SetColor Foreground Vivid Red] >> TIO.hPutStrLn stderr t >> setSGR [Reset]
 
 instance MonadLog (Step c s)  where
-    logInfo = liftIO . TIO.putStrLn
-    logError = liftIO . TIO.hPutStrLn stderr
+    logInfo t = liftIO $ do
+        setSGR [SetColor Foreground Vivid Blue]
+        TIO.putStrLn t
+        setSGR [Reset]
+    logError t = liftIO $ do
+        setSGR [SetColor Foreground Vivid Red] 
+        TIO.hPutStrLn stderr t 
+        setSGR [Reset]
 
 instance MonadLog SeldaM where
-    logInfo = liftIO . TIO.putStrLn
-    logError = liftIO . TIO.hPutStrLn stderr
+    logInfo t = liftIO $ do
+        setSGR [SetColor Foreground Vivid Blue] 
+        TIO.putStrLn t 
+        setSGR [Reset]
+    logError t = liftIO $ do 
+        setSGR [SetColor Foreground Vivid Red] 
+        TIO.hPutStrLn stderr t 
+        setSGR [Reset]
 
 type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m, MonadLog m)
 
