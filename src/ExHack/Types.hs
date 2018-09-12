@@ -158,6 +158,12 @@ instance Has (Config 'New) (DatabaseHandle 'New) where
 instance Has (Config 'Initialized) (DatabaseHandle 'Initialized) where
     hasLens = dbHandle
 
+instance Has (Config 'DepsGraph) (DatabaseHandle 'DepsGraph) where
+    hasLens = dbHandle
+
+instance Has (Config 'PkgExports) (DatabaseHandle 'PkgExports) where
+    hasLens = dbHandle
+
 instance Has (Config a) StackageFile where
     hasLens = stackageFile
 

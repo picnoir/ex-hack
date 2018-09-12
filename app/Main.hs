@@ -9,11 +9,12 @@ import           Prelude                hiding (readFile)
 
 import           ExHack.Data.Db         (mkHandle)
 import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
-                                         parseStackage)
+                                         indexSymbols, parseStackage,
+                                         retrievePkgsExports)
 import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseStatus (..), StackageFile (..),
                                          TarballsDir (..), WorkDir (..),
-                                         logInfoTitle, runStep)
+                                         runStep)
 
 type PreCondition = IO Bool
 
@@ -27,14 +28,14 @@ initConf = do
 
 main :: IO ()
 main = do
-    logInfoTitle "[+] STEP 0: Initializing database"
     c <- initConf
     dbInit <- runStep generateDb c
     let ci = c {_dbHandle= dbInit} :: Config 'Initialized
-    logInfoTitle "[+] STEP 1: Parsing stackage LTS-10.5"
     descs <- runStep parseStackage ci
-    logInfoTitle "[+] STEP 2: Downloading hackage files (cabal builds + tarballs)"
     runStep (dlAssets descs) ci 
-    logInfoTitle "[+] STEP 3: Generating dependancy graph"
-    pgks <- runStep (genGraphDep descs) ci
+    (dbGraph,pkgs) <- runStep (genGraphDep descs) ci
+    let cg = ci {_dbHandle=dbGraph} :: Config 'DepsGraph
+    (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
+    let ce = cg {_dbHandle=dbExprt} :: Config 'PkgExports
+    runStep (indexSymbols pe) ce
     pure ()
