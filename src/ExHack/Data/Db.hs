@@ -6,6 +6,7 @@
 module ExHack.Data.Db (
     mkHandle,
     initDb,
+    depGraphAlreadyHere,
     savePackages,
     savePackageDeps,
     savePackageMods,
@@ -34,6 +35,9 @@ import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
 
 mkHandle :: FilePath -> DatabaseHandle 'New
 mkHandle = id
+
+depGraphAlreadyHere :: DatabaseHandle 'New -> DatabaseHandle 'DepsGraph
+depGraphAlreadyHere = id
 
 packageId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text

@@ -10,6 +10,7 @@ module ExHack.ProcessingSteps (
     parseStackage,
     dlAssets,
     genGraphDep,
+    saveGraphDep,
     retrievePkgsExports,
     indexSymbols
 ) where
@@ -78,6 +79,10 @@ import           ExHack.Types                   (CabalFilesDir (..),
                                                  packagedlDescName)
 import           ExHack.Utils                   (Has (..))
 
+-- | `Step` 1: database generation.
+--
+--   This function creates a new SQLite database initialized according
+--   to ex-hack's internal SQL scheme.
 generateDb :: forall c m. 
     (Has c (DatabaseHandle 'New), 
      MonadStep c m) 
@@ -88,6 +93,10 @@ generateDb = do
     withSQLite fp initDb
     pure fp
 
+-- | `Step` 2: stackage file parsing.
+--
+--   This function parses the stackage file that will be used to 
+--   generate the packages dependancy graph.
 parseStackage :: forall c m.
     (Has c StackageFile,
      MonadStep c m)
@@ -98,6 +107,10 @@ parseStackage = do
     let packages = fromJust $ parseStackageYaml stackageYaml 
     pure $ getHackageUrls packages
 
+-- | `Step` 3: assets downloading.
+--
+--   This function downloads both the cabal files and the taballs of the packages.
+--   Everything will be downloaded from the <https://hackage.haskell.org> mirror.
 dlAssets :: forall c m.
     (Has c TarballsDir,
      Has c CabalFilesDir,
@@ -138,68 +151,88 @@ dlAssets packages = do
             BL.writeFile (tarballsDir </> T.unpack name <.> "tar.gz") $ responseBody f' 
             return ()
 
+-- | `Step` 4: Dependencies graph generation.
+--
+--   This function generates the packages dependancy graph.
+--
 genGraphDep :: forall c m.
     (Has c TarballsDir,
      Has c CabalFilesDir,
      Has c (DatabaseHandle 'Initialized),
      MonadStep c m)
-    => [PackageDlDesc] -> m (DatabaseHandle 'DepsGraph, [Package])
+    => [PackageDlDesc] -> m [Package]
 genGraphDep pd = do
     logInfoTitle "[Step 4] Generating dependencies graph."
-    dbHandle <- asks (view hasLens)
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
     logInfo "[+] Parsing cabal files."
     (_,pkgs) <- foldM (readPkgsFiles cd tbd (length pd)) (1,[]) pd
-    let pkgs' = getSuccParse (parseCabalFile <$> pkgs)
-    -- 2
-    liftIO $ withSQLite dbHandle $ do
-        logInfo "[+] Saving packages to DB..."
-        savePackages pkgs'
-        logInfo "[+] Done."
-        -- 3
-        logInfo "[+] Saving dependancies to DB..."
-        foldM_ (foldInsertDep (length pkgs)) 1 pkgs'
-        logInfo "[+] Done."
-        return ()
-    pure (dbHandle, pkgs')
+    pure $ getSuccParse (parseCabalFile <$> pkgs)
   where
     readPkgsFiles :: CabalFilesDir -> TarballsDir -> Int -> (Int, [TarballDesc])
                   -> PackageDlDesc -> m (Int, [TarballDesc])
     readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) !totalSteps (!step, xs) p = 
         handleAll logErrors $ do
-            logInfoProgress 5 totalSteps step $ "Reading" <> packagedlDescName p <> " cabal file."
-            let tp = tarballsDir <> T.unpack (packagedlDescName p) <> ".tar.gz"
-            cf <- liftIO $ T.readFile $ cabalFilesDir <> T.unpack (packagedlDescName p) <> ".cabal"
+            logInfoProgress 4 totalSteps step $ "Reading " <> packagedlDescName p <> " cabal file."
+            let tp = tarballsDir </> T.unpack (packagedlDescName p) <.> "tar.gz"
+            cf <- liftIO $ T.readFile $ cabalFilesDir </> T.unpack (packagedlDescName p) <.> "cabal"
             pure (step + 1, TarballDesc (tp,cf) : xs)
       where
         logErrors e = do
             logError $ "[Step 4] ERROR cannot read " <> packagedlDescName p
                        <> " cabal file: " <> T.pack (displayException e)
             pure (step + 1, xs)
+
+-- | `Step` 5: Save dependancies graph.
+-- 
+--   This step takes the previously generated dependancies graph and saves it
+--   in the database.
+--
+--   Caution: this step can be **really** long.
+saveGraphDep :: forall c m.
+    (Has c TarballsDir,
+     Has c CabalFilesDir,
+     Has c (DatabaseHandle 'Initialized),
+     MonadStep c m)
+    => [Package] -> m (DatabaseHandle 'DepsGraph)
+saveGraphDep pkgs = do
+    logInfoTitle "[Step 5] Saving dependencies graph."
+    dbHandle <- asks (view hasLens)
+    liftIO $ withSQLite dbHandle $ do
+        logInfo "[+] Saving packages to DB (may take some time)..."
+        savePackages pkgs
+        logInfo "[+] Done."
+        logInfo "[+] Saving dependancies to DB..."
+        -- TODO: maybe speedup this insert by caching the packages ids
+        -- in a hasmap in the memory. (or use sqlite in memory system????)
+        foldM_ (foldInsertDep (length pkgs)) 1 pkgs
+        logInfo "[+] Done."
+        return ()
+    pure dbHandle 
+  where
     foldInsertDep :: Int -> Int -> Package -> SeldaM Int
     foldInsertDep totalDeps step pkg = handleAll logErrors $ do 
         savePackageDeps pkg
-        logInfoProgress 4 totalDeps step $ "Saving " <> getName pkg <> " dependancies to DB."
+        logInfoProgress 5 totalDeps step $ "Saving " <> getName pkg <> " dependancies to DB."
         pure $ step + 1
       where
         logErrors e = do
-            logError $ "[Step 4] ERROR cannot insert " <> getName pkg <> " dependancies to DB: "
+            logError $ "[Step 5] ERROR cannot insert " <> getName pkg <> " dependancies to DB: "
                 <> T.pack (displayException e)
             pure $ step + 1
 
-
+-- | `Step` 6: extracting and indexing modules exports.
 retrievePkgsExports :: forall c m.
     (Has c WorkDir,
      Has c (DatabaseHandle 'DepsGraph),
      MonadStep c m)
    => [Package] -> m (DatabaseHandle 'PkgExports, [PackageExports])
 retrievePkgsExports pkgs = do
-    logInfoTitle "[Step 5] Retrieving package exports."
+    logInfoTitle "[Step 6] Retrieving modules exports."
     dbHandle <- asks (view hasLens)
     wd <- asks (view hasLens) 
     (_, pkgsExports) <- foldM (getPkgExports (length pkgs) wd) (1, []) pkgs
-    logInfo "[Step 5] Saving package exports to database."
+    logInfo "[Step 6] Saving modules exports to database."
     _ <- liftIO $ withSQLite dbHandle $
             foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
     pure (dbHandle, pkgsExports)
@@ -207,29 +240,29 @@ retrievePkgsExports pkgs = do
     savePackageModsLogProgress :: Int -> Int -> PackageExports -> SeldaM Int 
     savePackageModsLogProgress !totalSteps !step pe@(PackageExports (p,_,_)) = 
         handleAll logErrors $ do
-            logInfoProgress 5 totalSteps step $ "Saving " <> getName p <> " exports to database."
+            logInfoProgress 6 totalSteps step $ "Saving " <> getName p <> " exports to database."
             savePackageMods pe
             pure $ step + 1
       where
         logErrors e = do
-            logError $ "[Step 5] ERROR cannot save exports of " <> getName p 
+            logError $ "[Step 6] ERROR cannot save exports of " <> getName p 
                         <> " in database: " <> T.pack (displayException e)
             pure $ step + 1
     getPkgExports :: Int -> WorkDir -> (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
     getPkgExports totalSteps (WorkDir wd) (!nb, xs) p = handleAll logErrors $ do
-        logInfoProgress 5 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
+        logInfoProgress 6 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
         tb <- liftIO . BS.readFile $ tarballPath p
         tbp <- unpackHackageTarball wd tb
         x <- getPackageExports tbp p
         pure (nb + 1,  x : xs)
       where
         logErrors e = do
-            logError $ "[Step 5] ERROR cannot get exports for " <> getName p <> ": " 
+            logError $ "[Step 6] ERROR cannot get exports for " <> getName p <> ": " 
                      <> T.pack (displayException e)
             pure (nb + 1, xs)
             
 
--- | Indexes the code source symbols in the database.
+-- | `Step` 7: Indexes the code source symbols in the database.
 --
 -- For each package, component and module, this step will:
 --
@@ -245,13 +278,13 @@ indexSymbols :: forall c m.
      Has c (DatabaseHandle 'PkgExports))
   => [PackageExports] -> m ()
 indexSymbols pkgs = do
-    logInfoTitle "[Step 6] Indexing used symbols."
+    logInfoTitle "[Step 7] Indexing used symbols."
     dbh <- asks (view hasLens)
     foldM_ (indexPackage dbh (length pkgs)) 1 pkgs 
   where
     indexPackage :: DatabaseHandle 'PkgExports -> Int -> Int -> PackageExports -> m Int 
     indexPackage !dbh nb cur (PackageExports (p, pfp, _)) = do
-        logInfoProgress 6 nb cur $ "Indexing " <> getName p <> " used symbols."
+        logInfoProgress 7 nb cur $ "Indexing " <> getName p <> " used symbols."
         is <- liftIO $ withSQLite dbh $ getPkgImportScopes p
         indexComponent dbh p pfp is `mapM_` allModules p 
         pure $ cur + 1
@@ -277,7 +310,7 @@ indexSymbols pkgs = do
       where
         logErrors e = do
             let (ModuleNameT mnt) = getModNameT mn
-            logError $ "[Step 6] ERROR while indexing module " <> mnt <> " from package "
+            logError $ "[Step 7] ERROR while indexing module " <> mnt <> " from package "
                      <> getName p <> ": " <> T.pack (displayException e)
                     
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)

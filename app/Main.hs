@@ -12,10 +12,10 @@ import           System.Directory       (XdgDirectory (XdgData),
 import           System.FilePath        ((</>))
 
 
-import           ExHack.Data.Db         (mkHandle)
+import           ExHack.Data.Db         (depGraphAlreadyHere, mkHandle)
 import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
                                          indexSymbols, parseStackage,
-                                         retrievePkgsExports)
+                                         retrievePkgsExports, saveGraphDep)
 import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
                                          StackageFile (..), TarballsDir (..),
@@ -29,7 +29,8 @@ main = do
     let ci = c {_dbHandle= dbInit} :: Config 'Initialized
     descs <- runStep parseStackage ci
     shouldBypassAssetsDl (_tarballsDir c) (_cabalFilesDir c) $ runStep (dlAssets descs) ci 
-    (dbGraph,pkgs) <- runStep (genGraphDep descs) ci
+    pkgs <- runStep (genGraphDep descs) ci
+    dbGraph <- shouldBypassGraphDepsGen dbInit $ runStep (saveGraphDep pkgs) ci
     let cg = ci {_dbHandle=dbGraph} :: Config 'DepsGraph
     (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
     let ce = cg {_dbHandle=dbExprt} :: Config 'PkgExports
@@ -52,29 +53,30 @@ initConf = do
                   (CabalFilesDir cabal)
                   (WorkDir workdir)
 
+shouldBypassDBInit :: FilePath -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
+shouldBypassDBInit dbfp =
+    promptUser "Do you wanna skip the database init?" 
+               (pure $ newDatabaseHandle dbfp)
+
 shouldBypassAssetsDl :: TarballsDir -> CabalFilesDir -> IO () -> IO ()
 shouldBypassAssetsDl (TarballsDir fpt) (CabalFilesDir fpc) s = do
     dirT <- listDirectory fpt
     dirC <- listDirectory fpc
     if null (dirT <> dirC) 
         then s 
-        else do
-            r <- promptUser "Your assets folder is not empty. Do you want to empty it and re-download everything?"
-            if r
-                then removeDirectoryRecursive fpt >> removeDirectoryRecursive fpc >> s
-                else pure ()
+        else promptUser "Your assets folder is not empty. Do you want to empty it and re-download everything?"
+                        (removeDirectoryRecursive fpt >> removeDirectoryRecursive fpc >> s)
+                        (pure ())
 
-shouldBypassDBInit :: FilePath -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
-shouldBypassDBInit dbfp s = do
-    r <- promptUser "Do you wanna skip the database init?" 
-    if r
-        then pure $ newDatabaseHandle dbfp
-        else s
+shouldBypassGraphDepsGen :: DatabaseHandle 'New -> IO (DatabaseHandle 'DepsGraph) -> IO (DatabaseHandle 'DepsGraph)
+shouldBypassGraphDepsGen h =
+    promptUser "Do you wanna skip the dependancy graph generation?"
+               (pure $ depGraphAlreadyHere h)
 
-promptUser :: String -> IO Bool
-promptUser str = do
+promptUser :: String -> IO a -> IO a -> IO a
+promptUser str true false = do
     putStrLn (str <> " [y/N]")
     res <- getLine
     if head (words res) == "y"
-        then return True
-        else return False
+        then true
+        else false
