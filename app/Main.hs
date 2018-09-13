@@ -3,12 +3,12 @@
 
 module Main where
 
-import           Control.Monad          (when)
 import           Data.Text.IO           (readFile)
 import           Prelude                hiding (readFile)
 import           System.Directory       (XdgDirectory (XdgData),
                                          createDirectoryIfMissing,
-                                         getXdgDirectory, listDirectory)
+                                         getXdgDirectory, listDirectory,
+                                         removeDirectoryRecursive)
 import           System.FilePath        ((</>))
 
 
@@ -28,7 +28,7 @@ main = do
     dbInit <- shouldBypassDBInit (_dbHandle c) $ runStep generateDb c
     let ci = c {_dbHandle= dbInit} :: Config 'Initialized
     descs <- runStep parseStackage ci
-    shouldBypassAssetsDl (_tarballsDir c) $ runStep (dlAssets descs) ci 
+    shouldBypassAssetsDl (_tarballsDir c) (_cabalFilesDir c) $ runStep (dlAssets descs) ci 
     (dbGraph,pkgs) <- runStep (genGraphDep descs) ci
     let cg = ci {_dbHandle=dbGraph} :: Config 'DepsGraph
     (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
@@ -52,14 +52,17 @@ initConf = do
                   (CabalFilesDir cabal)
                   (WorkDir workdir)
 
-shouldBypassAssetsDl :: TarballsDir -> IO () -> IO ()
-shouldBypassAssetsDl (TarballsDir fp) s = do
-    empty <- null <$> listDirectory fp
-    when empty $ do
-        r <- promptUser "Your assets folder is not empty. Do you want to empty it and re-download everything?"
-        if r
-            then s
-            else pure ()
+shouldBypassAssetsDl :: TarballsDir -> CabalFilesDir -> IO () -> IO ()
+shouldBypassAssetsDl (TarballsDir fpt) (CabalFilesDir fpc) s = do
+    dirT <- listDirectory fpt
+    dirC <- listDirectory fpc
+    if null (dirT <> dirC) 
+        then s 
+        else do
+            r <- promptUser "Your assets folder is not empty. Do you want to empty it and re-download everything?"
+            if r
+                then removeDirectoryRecursive fpt >> removeDirectoryRecursive fpc >> s
+                else pure ()
 
 shouldBypassDBInit :: FilePath -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
 shouldBypassDBInit dbfp s = do

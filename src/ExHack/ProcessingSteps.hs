@@ -37,6 +37,7 @@ import           Network.HTTP.Client            (Manager, httpLbs,
                                                  parseRequest_,
                                                  proxyEnvironment, responseBody)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
+import           System.FilePath                ((<.>), (</>))
 
 import           ExHack.Cabal.CabalParser       (getSuccParse, parseCabalFile)
 import           ExHack.Data.Db                 (getPkgImportScopes, initDb,
@@ -132,9 +133,9 @@ dlAssets packages = do
       (PackageDlDesc (name, cabalUrl, tarballUrl)) = 
         liftIO $ do
             f <- httpLbs (parseRequest_ $ T.unpack cabalUrl) man 
-            BL.writeFile (cabalFilesDir ++ T.unpack name ++ ".cabal") $ responseBody f 
+            BL.writeFile (cabalFilesDir </> T.unpack name <.> "cabal") $ responseBody f 
             f' <-  httpLbs (parseRequest_ $ T.unpack tarballUrl) man
-            BL.writeFile (tarballsDir <> T.unpack name <> ".tar.gz") $ responseBody f' 
+            BL.writeFile (tarballsDir </> T.unpack name <.> "tar.gz") $ responseBody f' 
             return ()
 
 genGraphDep :: forall c m.
