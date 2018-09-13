@@ -47,19 +47,19 @@ import           System.FilePath         ((</>))
 import           ExHack.ModulePaths      (modName)
 import           ExHack.Types            (ComponentRoot (..), LocatedSym (..),
                                           ModuleNameT (..), Package (..),
-                                          SymName (..))
+                                          PackageFilePath (..), SymName (..))
 
-getDesugaredMod :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
+getDesugaredMod :: (MonadIO m) => PackageFilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
 getDesugaredMod pfp cr mn = 
     onModSum pfp cr mn (\modSum -> 
         parseModule modSum >>= typecheckModule >>= desugarModule)
 
-getModImports :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> m [ModuleNameT]
+getModImports :: (MonadIO m) => PackageFilePath -> ComponentRoot -> ModuleName -> m [ModuleNameT]
 getModImports pfp cr mn = 
     onModSum pfp cr mn (\modSum ->
         pure $ ModuleNameT . pack . moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
-getModSymbols :: (MonadIO m) => Package -> FilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
+getModSymbols :: (MonadIO m) => Package -> PackageFilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
 getModSymbols p pfp cr@(ComponentRoot crs) mn =
     withGhcEnv pfp cr mn $ do
         m <- findModule (mkModuleName $ modName mn) Nothing 
@@ -74,7 +74,7 @@ getModSymbols p pfp cr@(ComponentRoot crs) mn =
             getTNames (ITvarid n) = n
             getTNames _ = error "The impossible happened."
             (<$$>) = fmap . fmap
-            fileName = crs <> toFilePath mn
+            fileName = crs </> toFilePath mn
 
 getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do
@@ -101,8 +101,8 @@ getAvName :: AvailInfo -> SymName
 getAvName (Avail n) = SymName $ pack $ getOccString n
 getAvName (AvailTC n _ _) = SymName $ pack $ getOccString n
 
-withGhcEnv :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> Ghc a -> m a
-withGhcEnv pfp (ComponentRoot cr) mn a = do 
+withGhcEnv :: (MonadIO m) => PackageFilePath -> ComponentRoot -> ModuleName -> Ghc a -> m a
+withGhcEnv (PackageFilePath pfp) (ComponentRoot cr) mn a = do 
     dflagsCM <- getCabalDynFlagsLib pfp
     -- TODO: Setup better logging
     when (isNothing dflagsCM) . liftIO . putStrLn $ "Cannot retrieve cabal flags for " <> pfp <> "."
@@ -118,6 +118,6 @@ withGhcEnv pfp (ComponentRoot cr) mn a = do
   where
     fileName = cr <> toFilePath mn
 
-onModSum :: (MonadIO m) => FilePath -> ComponentRoot -> ModuleName -> (ModSummary -> Ghc a) -> m a
+onModSum :: (MonadIO m) => PackageFilePath -> ComponentRoot -> ModuleName -> (ModSummary -> Ghc a) -> m a
 onModSum pfp cr mn f = withGhcEnv pfp cr mn 
                         (getModSummary (mkModuleName $ modName mn) >>= f)

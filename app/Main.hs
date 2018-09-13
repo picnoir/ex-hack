@@ -54,8 +54,9 @@ initConf = do
                   (WorkDir workdir)
 
 shouldBypassDBInit :: FilePath -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
-shouldBypassDBInit dbfp =
-    promptUser "Do you wanna skip the database init?" 
+shouldBypassDBInit dbfp s =
+    promptUser "Do you wanna empty and init the database?" 
+               s
                (pure $ newDatabaseHandle dbfp)
 
 shouldBypassAssetsDl :: TarballsDir -> CabalFilesDir -> IO () -> IO ()
@@ -69,14 +70,15 @@ shouldBypassAssetsDl (TarballsDir fpt) (CabalFilesDir fpc) s = do
                         (pure ())
 
 shouldBypassGraphDepsGen :: DatabaseHandle 'New -> IO (DatabaseHandle 'DepsGraph) -> IO (DatabaseHandle 'DepsGraph)
-shouldBypassGraphDepsGen h =
-    promptUser "Do you wanna skip the dependancy graph generation?"
+shouldBypassGraphDepsGen h s =
+    promptUser "Do you wanna save the dependancy graph to the db?"
+               s
                (pure $ depGraphAlreadyHere h)
 
 promptUser :: String -> IO a -> IO a -> IO a
 promptUser str true false = do
     putStrLn (str <> " [y/N]")
     res <- getLine
-    if head (words res) == "y"
-        then true
-        else false
+    if null res || head (words res) == "n" || head (words res) == "N"
+        then false
+        else true

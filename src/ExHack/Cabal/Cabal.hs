@@ -3,16 +3,25 @@ module ExHack.Cabal.Cabal (
 ) where
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Maybe             (isJust)
 import           System.Directory       (withCurrentDirectory)
 import           System.Environment     (unsetEnv)
 import           System.Exit            (ExitCode (..))
 import           System.Process         (readProcessWithExitCode)
 
-buildPackage :: MonadIO m => FilePath -> m (Maybe (Int, String))
-buildPackage fp = liftIO $ withCurrentDirectory fp (installDeps >> build)
+import           ExHack.Types           (PackageFilePath (..))
+
+buildPackage :: MonadIO m => PackageFilePath -> m (Maybe (Int, String))
+buildPackage (PackageFilePath pfp) = liftIO $ withCurrentDirectory pfp cabalBuild
+  where
+    cabalBuild = do
+        rid <- installDeps
+        if isJust rid
+            then pure rid
+            else build
 
 installDeps :: MonadIO m => m (Maybe (Int, String))
-installDeps = runCabalCommand ["install", "--dependencies-only"]
+installDeps = runCabalCommand ["install","--dependencies-only"]
 
 build :: MonadIO m => m (Maybe (Int, String))
 build = runCabalCommand ["build"]

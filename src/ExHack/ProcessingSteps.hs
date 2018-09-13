@@ -18,7 +18,8 @@ module ExHack.ProcessingSteps (
 import           Control.Lens                   (view)
 import           Control.Monad                  (foldM, foldM_)
 import           Control.Monad.Catch            (MonadCatch, MonadThrow,
-                                                 displayException, handleAll)
+                                                 displayException, handleAll,
+                                                 throwM)
 import           Control.Monad.IO.Class         (liftIO)
 import           Control.Monad.Reader.Class     (asks)
 import qualified Data.ByteString                as BS (readFile)
@@ -40,6 +41,7 @@ import           Network.HTTP.Client            (Manager, httpLbs,
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
 import           System.FilePath                ((<.>), (</>))
 
+import           ExHack.Cabal.Cabal             (buildPackage)
 import           ExHack.Cabal.CabalParser       (getSuccParse, parseCabalFile)
 import           ExHack.Data.Db                 (getPkgImportScopes, initDb,
                                                  saveModuleUnifiedSymbols,
@@ -53,7 +55,8 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
 import           ExHack.ModulePaths             (toModFilePath)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
-import           ExHack.Types                   (CabalFilesDir (..),
+import           ExHack.Types                   (CabalBuildError (..),
+                                                 CabalFilesDir (..),
                                                  ComponentRoot (..),
                                                  DatabaseHandle,
                                                  DatabaseStatus (..),
@@ -77,7 +80,7 @@ import           ExHack.Types                   (CabalFilesDir (..),
                                                  getModNameT, getName,
                                                  getPackageNameT, logInfo,
                                                  packagedlDescName)
-import           ExHack.Utils                   (Has (..))
+import           ExHack.Utils                   (Has (..), foldM')
 
 -- | `Step` 1: database generation.
 --
@@ -166,7 +169,7 @@ genGraphDep pd = do
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
     logInfo "[+] Parsing cabal files."
-    (_,pkgs) <- foldM (readPkgsFiles cd tbd (length pd)) (1,[]) pd
+    (_,pkgs) <- foldM' (readPkgsFiles cd tbd (length pd)) (1,[]) pd
     pure $ getSuccParse (parseCabalFile <$> pkgs)
   where
     readPkgsFiles :: CabalFilesDir -> TarballsDir -> Int -> (Int, [TarballDesc])
@@ -231,7 +234,7 @@ retrievePkgsExports pkgs = do
     logInfoTitle "[Step 6] Retrieving modules exports."
     dbHandle <- asks (view hasLens)
     wd <- asks (view hasLens) 
-    (_, pkgsExports) <- foldM (getPkgExports (length pkgs) wd) (1, []) pkgs
+    (_, pkgsExports) <- foldM' (getPkgExports (length pkgs) wd) (1, []) pkgs
     logInfo "[Step 6] Saving modules exports to database."
     _ <- liftIO $ withSQLite dbHandle $
             foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
@@ -252,8 +255,10 @@ retrievePkgsExports pkgs = do
     getPkgExports totalSteps (WorkDir wd) (!nb, xs) p = handleAll logErrors $ do
         logInfoProgress 6 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
         tb <- liftIO . BS.readFile $ tarballPath p
-        tbp <- unpackHackageTarball wd tb
-        x <- getPackageExports tbp p
+        pfp <- unpackHackageTarball wd tb
+        cr <- buildPackage pfp
+        maybe (pure ()) (\(errCode, errStr) -> throwM $ CabalBuildError errCode errStr) cr 
+        x <- getPackageExports pfp p
         pure (nb + 1,  x : xs)
       where
         logErrors e = do
@@ -295,14 +300,14 @@ indexSymbols pkgs = do
         indexModule dbh p pfp is `mapM_` mfps
     indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
-    indexModule dbh p pfp@(PackageFilePath pfps) is (mn,cr) = handleAll logErrors $ do
-        imports <- getModImports pfps cr mn 
+    indexModule dbh p pfp is (mn,cr) = handleAll logErrors $ do
+        imports <- getModImports pfp cr mn 
         -- fis: filtered import scope according to this module imports
         -- isyms: imported symbols hashmap on which we will perform the unification
         let !fis = HM.filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
             !isyms = HS.unions $ HM.elems fis
             !isymsMap = HS.foldl' (\hm is'@(IndexedSym (n, _)) -> HM.insert n is' hm) HM.empty isyms 
-        syms <- getModSymbols p pfps cr mn
+        syms <- getModSymbols p pfp cr mn
         fileContent <- liftIO $ T.readFile $ toModFilePath pfp cr mn
         let !file = SourceCodeFile fileContent (getModNameT mn) (getPackageNameT p)
             !unsyms = unifySymbols isymsMap syms
@@ -314,9 +319,8 @@ indexSymbols pkgs = do
                      <> getName p <> ": " <> T.pack (displayException e)
                     
     findModuleFilePath :: PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, ComponentRoot)
-    findModuleFilePath (PackageFilePath pfp) crs mn = do
-        let !rcrs = (\(ComponentRoot cr') -> ComponentRoot (pfp <> cr')) <$> crs
-        cr <- findComponentRoot rcrs mn
+    findModuleFilePath pfp crs mn = do
+        cr <- findComponentRoot pfp crs mn
         pure (mn, cr)
     unifySymbols :: HM.HashMap SymName IndexedSym -> [LocatedSym] -> [UnifiedSym]
     unifySymbols isyms = foldl' foldLSym []

@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeSynonymInstances       #-}
 
 module ExHack.Types (
+    CabalBuildError(..),
     Config(..),
     ComponentRoot(..),
     PackageComponent(..),
@@ -310,3 +311,7 @@ getPackageNameT p = PackageNameT (getName p)
 data PackageLoadError = CannotFindModuleFile ModuleName [ComponentRoot]
     deriving (Show)
 instance Exception PackageLoadError
+
+data CabalBuildError = CabalBuildError Int String
+    deriving (Show)
+instance Exception CabalBuildError

@@ -35,12 +35,12 @@ import           ExHack.Types           (ComponentRoot (..), ModuleName,
 unpackHackageTarball :: (MonadIO m) => 
   FilePath -- ^ 'FilePath' pointing to the directory we want to extract the tarball to. 
   -> BS.ByteString -- ^ Tarball in the 'ByteString'.
-  -> m FilePath -- ^ Newly created directory containing the extracted tarball.
+  -> m PackageFilePath -- ^ Newly created directory containing the extracted tarball.
 unpackHackageTarball dir tb = do
   let rp = Tar.read . decompress $ BL.fromStrict tb
   liftIO $ Tar.unpack dir rp 
   adir <- liftIO $ makeAbsolute dir
-  pure $ adir </> getRootPath rp 
+  pure $ PackageFilePath $ adir </> getRootPath rp 
   where
     getRootPath (Tar.Next e _) = Tar.entryPath e
     getRootPath _ = error "Cannot find tar's root directory."
@@ -48,9 +48,9 @@ unpackHackageTarball dir tb = do
 -- | Get the tarball description of a directory. Returns Nothing if
 -- the specified directory is empty.
 getTarballDesc :: (MonadIO m) => 
-  FilePath -- ^ 'FilePath' that may contain a tarball. 
+  PackageFilePath -- ^ 'FilePath' that may contain a tarball. 
   -> m (Maybe TarballDesc)
-getTarballDesc fp = do
+getTarballDesc (PackageFilePath fp) = do
   f <- Just <$> liftIO (listDirectory fp)
   let mcfp = f >>= getCabalFp >>= \case
         [] -> Nothing
@@ -65,21 +65,21 @@ getTarballDesc fp = do
     getCabalFp = Just <$> filter (isSuffixOf ".cabal")
 
 -- | Retrieve the exported symbols of a cabal package.
-getPackageExports :: (MonadIO m) => FilePath -> Package -> m PackageExports
-getPackageExports pfp p = do
-  em <- liftIO $ withCurrentDirectory pfp (loadExposedModules pfp p)
-  pure $ PackageExports (p, PackageFilePath pfp, getExports <$> em)
+getPackageExports :: (MonadIO m) => PackageFilePath -> Package -> m PackageExports
+getPackageExports pfp@(PackageFilePath pfps) p = do
+  em <- liftIO $ withCurrentDirectory pfps (loadExposedModules pfp p)
+  pure $ PackageExports (p, pfp, getExports <$> em)
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 
-loadExposedModules :: (MonadIO m, MonadThrow m) => FilePath -> Package -> m [(ModuleName, DesugaredModule)] 
+loadExposedModules :: (MonadIO m, MonadThrow m) => PackageFilePath -> Package -> m [(ModuleName, DesugaredModule)] 
 loadExposedModules pfp p = loadModule pfp croots `mapM` maybe mempty mods exMods
     where
         !exMods = exposedModules p 
         croots :: [ComponentRoot]
         !croots = maybe [ComponentRoot "./"] roots exMods
 
-loadModule :: forall m. (MonadIO m, MonadThrow m) => FilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
+loadModule :: forall m. (MonadIO m, MonadThrow m) => PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
 loadModule pfp croots mn = do
-    cr <- findComponentRoot croots mn
+    cr <- findComponentRoot pfp croots mn
     getDesugaredMod pfp cr mn >>= \m -> pure (mn,m)

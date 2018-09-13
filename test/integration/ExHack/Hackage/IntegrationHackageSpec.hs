@@ -9,7 +9,7 @@ import Test.Hspec (Spec, describe, it, shouldBe, shouldSatisfy)
 
 import ExHack.Cabal.CabalParser(parseCabalFile, getSuccParse)
 import ExHack.Cabal.Cabal(buildPackage)
-import ExHack.Types (ModuleName, SymName)
+import ExHack.Types (ModuleName, SymName, PackageFilePath(..))
 import ExHack.Hackage.Hackage (unpackHackageTarball, getTarballDesc,
                               getPackageExports, PackageExports(..))
 
@@ -17,7 +17,7 @@ import ExHack.Hackage.Hackage (unpackHackageTarball, getTarballDesc,
 spec :: Spec
 spec = describe "hackage" $ do
         it "should extract the content of a tarball" $ do
-          r <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
+          (PackageFilePath r) <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
           r `shouldSatisfy` isSuffixOf "test/integration/workdir/timeit-1.0.0.0/"
         it "should build a tarball" $ do
           tbp <- unpackHackageTarball "./test/integration/workdir/" $(embedFile "./test/integration/fixtures/timeit.tar.gz")
