@@ -1,0 +1,5 @@
+:set -i./src
+:set -i./app
+:set -i./test
+:set -Wall
+:load Main
