@@ -57,9 +57,9 @@ spec = do
     before cleanWorkdir $ describe "processing steps" $
         it "should perform a e2e run with a reduced set of packages" $ do
             tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/timeit.tar.gz")
-            tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/text.tar.gz")
+            tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/BiobaseNewick.tar.gz")
             let descs = [PackageDlDesc ("text", "dontcare", "dontcare"), 
-                         PackageDlDesc ("timeit", "dontcare", "dontcare")] 
+                         PackageDlDesc ("BiobaseNewick", "dontcare", "dontcare")] 
                 c = testConf :: Config 'New
             dbInit <- runStep generateDb c
             let ci = c {_dbHandle= dbInit} :: Config 'Initialized
