@@ -29,7 +29,7 @@ findComponentRoot :: (MonadIO m, MonadThrow m) => PackageFilePath -> [ComponentR
 findComponentRoot (PackageFilePath pfp) croots mn = do
     -- We need to append the package basePath to the roots
     let acroots = (\(ComponentRoot cr') -> ComponentRoot (pfp <> cr')) <$> croots
-    xs <- liftIO $ withCurrentDirectory pfp $ filterM testPath ("./." : acroots)
+    xs <- liftIO $ withCurrentDirectory pfp $ filterM testPath ("./" : acroots)
     if length xs == 1
        then pure $ head xs
        else throwM $ CannotFindModuleFile mn croots

@@ -1,8 +1,8 @@
-    with import <nixpkgs> {}; {
+    with import <nixpkgs> {}; rec {
+      unstable = import <nixos-unstable> {};
       ExHack = stdenv.mkDerivation {
         name = "ExHack";
-        buildInputs = [ haskell.compiler.ghc843 sqlite gnumake gcc-unwrapped cabal-install zlib ];
-        NIX_LDFLAGS ="${zlib.out}/lib";
+        buildInputs = [ unstable.stack haskell.compiler.ghc843 sqlite gnumake gcc-unwrapped cabal-install zlib ];
       };
     }
 

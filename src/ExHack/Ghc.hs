@@ -116,7 +116,7 @@ withGhcEnv (PackageFilePath pfp) (ComponentRoot cr) mn a = do
         _ <- load LoadAllTargets
         a
   where
-    fileName = cr <> toFilePath mn
+    fileName = cr </> toFilePath mn
 
 onModSum :: (MonadIO m) => PackageFilePath -> ComponentRoot -> ModuleName -> (ModSummary -> Ghc a) -> m a
 onModSum pfp cr mn f = withGhcEnv pfp cr mn 
