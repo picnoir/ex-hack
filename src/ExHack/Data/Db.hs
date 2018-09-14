@@ -98,6 +98,7 @@ initDb = do
     tryCreateTable packages 
     tryCreateTable dependancies 
     tryCreateTable exposedModules
+    tryCreateTable exposedSymbols
     tryCreateTable symbolOccurences
     tryCreateTable sourceFiles
 

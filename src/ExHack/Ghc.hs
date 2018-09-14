@@ -42,7 +42,8 @@ import           Lexer                   (Token (ITqvarid, ITvarid))
 import           Module                  (UnitId (..))
 import           Name                    (getOccString)
 import           Safe                    (headMay)
-import           System.FilePath         ((</>))
+import           System.Directory        (makeAbsolute)
+import           System.FilePath         ((<.>), (</>))
 
 import           ExHack.ModulePaths      (modName)
 import           ExHack.Types            (ComponentRoot (..), LocatedSym (..),
@@ -60,9 +61,10 @@ getModImports pfp cr mn =
         pure $ ModuleNameT . pack . moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
 getModSymbols :: (MonadIO m) => Package -> PackageFilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
-getModSymbols p pfp cr@(ComponentRoot crs) mn =
+getModSymbols p pfp cr@(ComponentRoot crs) mn = do
+    modPath <- liftIO $ makeAbsolute $ toFilePath mn <.> "hs"
     withGhcEnv pfp cr mn $ do
-        m <- findModule (mkModuleName $ modName mn) Nothing 
+        m <- findModule (mkModuleName $ modPath) Nothing 
         ts <- getTokenStream m
         let sns = (SymName . pack . unpackFS . getTNames) <$$> filter filterTokenTypes ts
         pure $ (\sn -> LocatedSym (p, fileName, sn)) <$> sns 
@@ -74,7 +76,7 @@ getModSymbols p pfp cr@(ComponentRoot crs) mn =
             getTNames (ITvarid n) = n
             getTNames _ = error "The impossible happened."
             (<$$>) = fmap . fmap
-            fileName = crs </> toFilePath mn
+            fileName = crs </> toFilePath mn <.> "hs"
 
 getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do

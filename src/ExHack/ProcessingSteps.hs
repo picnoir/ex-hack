@@ -294,9 +294,13 @@ indexSymbols pkgs = do
         pure $ cur + 1
     indexComponent :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                    -> PackageComponent -> m ()
-    indexComponent dbh p pfp is pc = do
-        mfps <- findModuleFilePath pfp (roots pc) `mapM` mods pc
-        indexModule dbh p pfp is `mapM_` mfps
+    indexComponent dbh p pfp is pc = handleAll logErrors $ do
+            mfps <- findModuleFilePath pfp (roots pc) `mapM` mods pc
+            indexModule dbh p pfp is `mapM_` mfps
+      where
+        logErrors e = do
+            logError $ "[Step 7] ERROR while indexing component " <> T.pack (show pc) <> " from package "
+                     <> getName p <> ": " <> T.pack (displayException e)
     indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
     indexModule dbh p pfp is (mn,cr) = handleAll logErrors $ do
