@@ -16,7 +16,7 @@ module ExHack.ProcessingSteps (
 ) where
 
 import           Control.Lens                   (view)
-import           Control.Monad                  (foldM, foldM_)
+import           Control.Monad                  (foldM_)
 import           Control.Monad.Catch            (MonadCatch, MonadThrow,
                                                  displayException, handleAll,
                                                  throwM)
@@ -266,7 +266,6 @@ retrievePkgsExports pkgs = do
                      <> T.pack (displayException e)
             pure (nb + 1, xs)
             
-
 -- | `Step` 7: Indexes the code source symbols in the database.
 --
 -- For each package, component and module, this step will:

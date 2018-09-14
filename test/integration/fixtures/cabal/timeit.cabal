@@ -1,0 +1,12 @@
+Name:		timeit
+Version:	1.0.0.0
+License:	BSD3
+Author:		Lennart Augustsson
+Maintainer:	Lennart Augustsson
+Category:	System
+Synopsis:	Time a computation
+Description:	A simple wrapper of an IO computation to show the used CPU time.
+Build-type:	Simple
+Build-Depends:	base
+Exposed-modules:	System.TimeIt
+build-depends: base >= 3 && < 5

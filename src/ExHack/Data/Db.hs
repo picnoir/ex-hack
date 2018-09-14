@@ -94,7 +94,12 @@ symbolOccurences :: Table (RowID :*: Int :*: Int :*: RowID :*: RowID)
 
 -- | Create the internal database schema.
 initDb :: (MonadSelda m) => m ()
-initDb = tryCreateTable packages >> tryCreateTable dependancies >> tryCreateTable exposedModules
+initDb = do
+    tryCreateTable packages 
+    tryCreateTable dependancies 
+    tryCreateTable exposedModules
+    tryCreateTable symbolOccurences
+    tryCreateTable sourceFiles
 
 -- | Save a package dependancies.
 --

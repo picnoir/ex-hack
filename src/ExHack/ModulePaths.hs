@@ -23,12 +23,11 @@ modName mn = intercalate "." $ components mn
 
 toModFilePath :: PackageFilePath -> ComponentRoot -> ModuleName -> FilePath
 toModFilePath (PackageFilePath pfp) (ComponentRoot cr) mn = 
-    pfp </> cr </> toFilePath mn <> ".hs"
+    pfp </> cr </> toFilePath mn <.> "hs"
 
 findComponentRoot :: (MonadIO m, MonadThrow m) => PackageFilePath -> [ComponentRoot] -> ModuleName -> m ComponentRoot  
 findComponentRoot (PackageFilePath pfp) croots mn = do
-    -- We need to append the package basePath to the roots
-    let acroots = (\(ComponentRoot cr') -> ComponentRoot (pfp <> cr')) <$> croots
+    let acroots = (\(ComponentRoot cr') -> ComponentRoot (pfp </> cr')) <$> croots
     xs <- liftIO $ withCurrentDirectory pfp $ filterM testPath ("./" : acroots)
     if length xs == 1
        then pure $ head xs

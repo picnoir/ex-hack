@@ -1,5 +1,6 @@
 :set -i./src
 :set -i./app
-:set -i./test
+:set -i./test/integration
+:set -i./test/unit
 :set -Wall
 :load Main
