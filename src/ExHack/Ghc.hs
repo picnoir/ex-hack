@@ -1,15 +1,20 @@
+{-|
+Module      : ExHack.Ghc
+Description : GHC-API programs.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE OverloadedStrings #-}
 module ExHack.Ghc (
   UnitId(..),
   TypecheckedSource,
   DesugaredModule(..),
   getDesugaredMod,
-  getModUnitId,
-  getModName,
   getModExports,
   getModImports,
   getModSymbols,
-  getContent,
   unLoc
   ) where
 
@@ -31,12 +36,10 @@ import           GHC                     (DesugaredModule, GenLocated (..), Ghc,
                                           findModule, getModSummary,
                                           getSessionDynFlags, getTokenStream,
                                           guessTarget, load, mkModuleName,
-                                          moduleName, moduleNameString,
-                                          moduleUnitId, ms_textual_imps, noLoc,
-                                          parseDynamicFlags, parseModule,
+                                          moduleNameString, ms_textual_imps,
+                                          noLoc, parseDynamicFlags, parseModule,
                                           runGhc, setSessionDynFlags,
-                                          setTargets, tm_typechecked_source,
-                                          typecheckModule, unLoc)
+                                          setTargets, typecheckModule, unLoc)
 import           GHC.Paths               (libdir)
 import           HscTypes                (ModGuts (..))
 import           Lexer                   (Token (ITqvarid, ITvarid))
@@ -50,23 +53,35 @@ import           ExHack.ModulePaths      (modName)
 import           ExHack.Types            (ComponentRoot (..), LocatedSym (..),
                                           ModuleNameT (..), MonadLog (..),
                                           Package (..), PackageFilePath (..),
-                                          SymName (..))
-import qualified ExHack.Types            as Types (getModName)
+                                          SymName (..), getModName)
 
-getDesugaredMod :: (MonadIO m, MonadLog m) => PackageFilePath -> ComponentRoot -> ModuleName -> m DesugaredModule 
+-- | Retrieves a GHC-API's module after type-checking and desugaring it.
+--
+-- This function will call GHC to parse, typecheck and desugar the module.
+--
+-- This will fails if the pointed source code is not valid.
+getDesugaredMod :: (MonadIO m, MonadLog m) => PackageFilePath -> ComponentRoot -> ModuleName -> m DesugaredModule
 getDesugaredMod pfp cr mn = 
     onModSum pfp cr mn (\modSum -> 
         parseModule modSum >>= typecheckModule >>= desugarModule)
 
+-- | Retrieves a module's imported symbols.
+--
+--   This function will call GHC to parse and typecheck the module.
+--
+--   This will fails if the pointed source code is not valid.
 getModImports :: (MonadIO m, MonadLog m) => PackageFilePath -> ComponentRoot -> ModuleName -> m [ModuleNameT]
 getModImports pfp cr mn = 
     onModSum pfp cr mn (\modSum ->
         pure $ ModuleNameT . pack . moduleNameString . unLoc . snd <$> ms_textual_imps modSum)
 
+-- | Retrieve all the symbols used in the module body.
+--
+--   This function wil use GHC to generate the tokens of source code.
 getModSymbols :: (MonadIO m, MonadLog m) => Package -> PackageFilePath -> ComponentRoot -> ModuleName -> m [LocatedSym] 
 getModSymbols p pfp cr@(ComponentRoot crt) mn =
     withGhcEnv pfp cr mn $ do
-        m <- findModule (mkModuleName $ T.unpack $ Types.getModName mn) Nothing 
+        m <- findModule (mkModuleName $ T.unpack $ getModName mn) Nothing 
         ts <- getTokenStream m
         let sns = (SymName . pack . unpackFS . getTNames) <$$> filter filterTokenTypes ts
         pure $ (\sn -> LocatedSym (p, fileName, sn)) <$> sns 
@@ -89,17 +104,9 @@ getCabalDynFlagsLib fp = do
     getLib (_,H.ChLibName) = True
     getLib _ = False
 
-getModUnitId :: DesugaredModule -> UnitId
-getModUnitId = moduleUnitId . mg_module . dm_core_module
-
-getModName :: DesugaredModule -> String
-getModName = moduleNameString . moduleName . mg_module . dm_core_module
-
+-- | Retrieves a `DesugaredModule` exported symbols.
 getModExports :: DesugaredModule -> [SymName]
 getModExports = fmap getAvName . mg_exports . dm_core_module
-
-getContent :: DesugaredModule -> TypecheckedSource
-getContent = tm_typechecked_source . dm_typechecked_module
 
 getAvName :: AvailInfo -> SymName
 getAvName (Avail n) = SymName $ pack $ getOccString n

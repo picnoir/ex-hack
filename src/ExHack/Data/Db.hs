@@ -1,3 +1,11 @@
+{-|
+Module      : ExHack.Data.Db
+Description : Database-related operations.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,6 +21,7 @@ module ExHack.Data.Db (
     savePackages
 ) where
 
+import           Control.Monad          (unless)
 import           Control.Monad.Catch    (Exception, MonadMask, throwM)
 import qualified Data.HashMap.Strict    as HM (fromList)
 import qualified Data.HashSet           as HS (HashSet, fromList)
@@ -146,6 +155,8 @@ savePackageMods (PackageExports (p, _, xs)) = do
         mid <- insertWithPK exposedModules [def :*: getModName m :*: pid]
         insert_  exposedSymbols $ (\(SymName sn) -> def :*: sn :*: mid) <$> syms
 
+-- | Given a module database ID, saves the exported symbols of this
+--   module in ExHack's database.
 saveModuleExports :: (MonadSelda m) => Int -> [SymName] -> m ()
 saveModuleExports midi xs = insert_ exposedSymbols $ 
     (\(SymName s) -> def :*: s :*: fromSql (SqlInt midi)) <$> xs
@@ -169,6 +180,11 @@ getPkgModules p = do
   where
     wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId i)
 
+-- | Query ExHack database to retrieve the available symbols to be imported
+--   from within this package.
+--
+--   This scope should be filtered on a per-module basis, depending on the module
+--   imports, before being used in a symbol unification.
 getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => T.Package -> m ImportsScope
 getPkgImportScopes p = do
     mods <- getPkgModules p
@@ -187,10 +203,13 @@ getPkgImportScopes p = do
         pure (mnt, HS.fromList (wrapResult <$> q)) 
     wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId i)
 
+-- | Insert both the source file in which some symbols have been unified as well as 
+--   the symbols occurences in ExHack's database.
 saveModuleUnifiedSymbols :: forall m. (MonadSelda m, MonadMask m) => [UnifiedSym] -> SourceCodeFile -> m ()
-saveModuleUnifiedSymbols xs (SourceCodeFile f (ModuleNameT mnt) (PackageNameT pnt)) = do
-    fid <- insertWithPK sourceFiles [def :*:  f :*: mnt :*: pnt]
-    insert_ symbolOccurences $ generateLine fid <$> xs
+saveModuleUnifiedSymbols xs (SourceCodeFile f (ModuleNameT mnt) (PackageNameT pnt)) = 
+    unless (null xs) $ do
+        fid <- insertWithPK sourceFiles [def :*:  f :*: mnt :*: pnt]
+        insert_ symbolOccurences $ generateLine fid <$> xs
   where
       generateLine fid (UnifiedSym (IndexedSym (_, sidi), LocatedSym (_, _, gloc))) = 
           def :*: col :*: line :*: fid :*: sid 

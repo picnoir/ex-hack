@@ -1,3 +1,12 @@
+{-|
+Module      : ExHack.ProcessingSteps
+Description : Processing operations used to both generate the ExHack database and the HTML documentation.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
+
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}

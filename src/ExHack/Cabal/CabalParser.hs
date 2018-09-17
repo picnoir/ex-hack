@@ -1,3 +1,11 @@
+{-|
+Module      : ExHack.Cabal.CabalParser
+Description : Cabal files parsers collection.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
 module ExHack.Cabal.CabalParser (
   parseCabalFile,
   getSuccParse,
@@ -42,6 +50,7 @@ import           ExHack.Types                                 (ComponentRoot (..
                                                                TarballDesc (..),
                                                                pkgName)
 
+-- | Filtering out the parse failures from a `ParseResult` list.
 getSuccParse :: [ParseResult Package] -> [Package]
 getSuccParse = foldr appendParseResult [] 
     where
