@@ -9,54 +9,57 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module ExHack.Types (
+    AlterDatabase,
     CabalBuildError(..),
-    Config(..),
+    CabalFilesDir(..),
     ComponentRoot(..),
-    PackageComponent(..),
-    Package(..),
-    PackageLoadError(..),
-    PackageIdentifier(..),
-    PackageFilePath(..),
-    PackageName,
-    PackageNameT(..),
-    PackageDlDesc(..),
-    TarballDesc(..),
-    ModuleName(..),
-    ModuleNameT(..),
-    IndexedModuleNameT(..),
-    SymName(..),
-    LocatedSym(..),
-    IndexedSym(..),
-    UnifiedSym(..),
+    Config(..),
     DatabaseHandle,
     DatabaseStatus(..),
-    StackageFile(..),
-    TarballsDir(..),
-    CabalFilesDir(..),
-    WorkDir(..),
-    PackageExports(..),
-    MonadLog(..),
     ImportsScope,
+    IndexedModuleNameT(..),
+    IndexedSym(..),
+    LocatedSym(..),
+    ModuleName(..),
+    ModuleNameT(..),
+    MonadLog(..),
     MonadStep,
-    Step,
+    Package(..),
+    PackageComponent(..),
+    PackageDlDesc(..),
+    PackageExports(..),
+    PackageFilePath(..),
+    PackageIdentifier(..),
+    PackageLoadError(..),
+    PackageName,
+    PackageNameT(..),
     SourceCodeFile(..),
-    tarballsDir,
+    StackageFile(..),
+    Step,
+    SymName(..),
+    TarballDesc(..),
+    TarballsDir(..),
+    UnifiedSym(..),
+    WorkDir(..),
     cabalFilesDir,
-    workDir,
-    runStep,
-    mkPackageName,
-    mkVersion,
-    getName,
+    depsNames,
+    fromComponents,
+    getDatabaseHandle,
     getModName,
     getModNameT,
+    getName,
     getPackageNameT,
-    depsNames,
+    mkPackageName,
+    mkVersion,
+    newDatabaseHandle,
     packagedlDescName,
-    fromComponents,
     parseConfig,
-    newDatabaseHandle
+    runStep,
+    tarballsDir,
+    workDir
 ) where
 
 import           Prelude                        hiding (length, replicate)
@@ -97,12 +100,19 @@ import           System.IO                      (stderr)
 
 import           ExHack.Utils                   (Has (..))
 
--- | Cabal component root filepath. The module names should be
---   resolved using this filepath as root.
+-- | Cabal component root filepath. 
+--
+--   Module names should be resolved using this filepath as root.
 newtype ComponentRoot = ComponentRoot FilePath
     deriving (IsString, Eq, Show)
 
 -- | Cabal package component.
+--
+--   In cabal's terms, a package component is a collection of modules
+--   which can materialize either a library, a test suite or an application.
+--
+--   A same package component source code can be splitted into several
+--   directories AKA. component roots.
 data PackageComponent = PackageComponent {
     mods :: [ModuleName],
     roots :: [ComponentRoot]
@@ -111,24 +121,58 @@ data PackageComponent = PackageComponent {
 -- | Package main datatype.
 data Package = Package {
   name :: PackageIdentifier,
+  -- ^ A package identified contains both a unique identifier
+  --   as well as a version.
   deps :: Set PackageName,
+  -- ^ Dependancies needed to build this package.
   cabalFile :: Text,
+  -- ^ Cabal file providing a detailed description of this package.
   tarballPath :: FilePath,
+  -- ^ Local path to the tarball containing the source code of this package.
+  -- 
+  -- Invariant: this filepath should **always** point to a valid tarball of this package.
   exposedModules :: Maybe PackageComponent,
+  -- ^ Exposed module list if this package exposes a library.
   dbId :: Maybe RowID,
-  allModules :: [PackageComponent]
+  -- ^ Index of this package in ex-hack's database.
+  --
+  -- Nothing if the package has not been inserted yet in the database.
+  allComponents :: [PackageComponent]
+  -- ^ Components of the package, including the one not exporting any symbols.
+  --
+  --   These modules are used as corpus during the symbol occurence search.
 } deriving (Eq, Show)
 
-
+-- | Local directory containing the downloaded tarballs.
 newtype TarballsDir = TarballsDir FilePath deriving (Eq, Show)
+
+-- | Local directory containing the downloaded cabal files.
 newtype CabalFilesDir = CabalFilesDir FilePath deriving (Eq, Show)
+
+-- | Local directory in which the tarballs are extracted and the 
+--   packages built.
 newtype WorkDir = WorkDir FilePath deriving (Eq, Show)
 
+-- | Algebraic data type representing the database status.
+--
+--   This type should be used to parametrize the `DatabaseHandle`
+--   dataype using the DataKinds GHC extension.
 data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
-type DatabaseHandle (a :: DatabaseStatus) = FilePath
+
+-- | 
+newtype DatabaseHandle (a :: DatabaseStatus) = DatabaseHandle FilePath
+    deriving (Eq, Show)
+
+type family AlterDatabase (a :: DatabaseStatus) :: DatabaseStatus where
+    AlterDatabase 'New = 'Initialized
+    AlterDatabase 'Initialized = 'DepsGraph
+    AlterDatabase 'DepsGraph = 'PkgExports
+
+getDatabaseHandle :: DatabaseHandle (a :: DatabaseStatus) -> (FilePath, DatabaseHandle (AlterDatabase a))
+getDatabaseHandle (DatabaseHandle fp) = (fp, DatabaseHandle fp)
 
 newDatabaseHandle :: FilePath -> DatabaseHandle 'New
-newDatabaseHandle = id
+newDatabaseHandle = DatabaseHandle
 
 newtype StackageFile = StackageFile Text deriving (Eq, Show)
 

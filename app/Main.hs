@@ -12,14 +12,14 @@ import           System.Directory       (XdgDirectory (XdgData),
 import           System.FilePath        ((</>))
 
 
-import           ExHack.Data.Db         (depGraphAlreadyHere, mkHandle)
 import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
                                          indexSymbols, parseStackage,
                                          retrievePkgsExports, saveGraphDep)
 import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
                                          StackageFile (..), TarballsDir (..),
-                                         WorkDir (..), newDatabaseHandle,
+                                         WorkDir (..), getDatabaseHandle,
+                                         newDatabaseHandle, newDatabaseHandle,
                                          runStep)
 
 main :: IO ()
@@ -47,17 +47,17 @@ initConf = do
     createDirectoryIfMissing True cabal
     createDirectoryIfMissing True workdir
     stackageYaml <- readFile "./data/lts-10.5.yaml"
-    pure $ Config (mkHandle $ dataDir </> "database.sqlite")
+    pure $ Config (newDatabaseHandle $ dataDir </> "database.sqlite")
                   (StackageFile stackageYaml) 
                   (TarballsDir tarballs) 
                   (CabalFilesDir cabal)
                   (WorkDir workdir)
 
-shouldBypassDBInit :: FilePath -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
-shouldBypassDBInit dbfp s =
+shouldBypassDBInit :: DatabaseHandle 'New -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
+shouldBypassDBInit dbh s =
     promptUser "Do you wanna empty and init the database?" 
                s
-               (pure $ newDatabaseHandle dbfp)
+               (pure . snd $ getDatabaseHandle dbh)
 
 shouldBypassAssetsDl :: TarballsDir -> CabalFilesDir -> IO () -> IO ()
 shouldBypassAssetsDl (TarballsDir fpt) (CabalFilesDir fpc) s = do
@@ -69,11 +69,11 @@ shouldBypassAssetsDl (TarballsDir fpt) (CabalFilesDir fpc) s = do
                         (removeDirectoryRecursive fpt >> removeDirectoryRecursive fpc >> s)
                         (pure ())
 
-shouldBypassGraphDepsGen :: DatabaseHandle 'New -> IO (DatabaseHandle 'DepsGraph) -> IO (DatabaseHandle 'DepsGraph)
+shouldBypassGraphDepsGen :: DatabaseHandle 'Initialized -> IO (DatabaseHandle 'DepsGraph) -> IO (DatabaseHandle 'DepsGraph)
 shouldBypassGraphDepsGen h s =
     promptUser "Do you wanna save the dependancy graph to the db?"
                s
-               (pure $ depGraphAlreadyHere h)
+               (pure . snd $ getDatabaseHandle h)
 
 promptUser :: String -> IO a -> IO a -> IO a
 promptUser str true false = do

@@ -6,14 +6,14 @@ module ExHack.Hackage.IntegrationHackageSpec (spec) where
 import           Data.FileEmbed           (embedFile)
 import           Data.List                (isSuffixOf)
 import           Data.Maybe               (fromJust, isNothing)
+import           System.Directory         (createDirectory, makeAbsolute,
+                                           removeDirectoryRecursive)
 import           System.FilePath          (equalFilePath, (</>))
-import System.Directory (makeAbsolute, removeDirectoryRecursive, createDirectory)
-import           Test.Hspec               (Spec, describe, it, shouldBe,
-                                           shouldSatisfy, before)
+import           Test.Hspec               (Spec, before, describe, it, shouldBe,
+                                           shouldSatisfy)
 
 import           ExHack.Cabal.Cabal       (buildPackage)
 import           ExHack.Cabal.CabalParser (getSuccParse, parseCabalFile)
-import           ExHack.Data.Db           (mkHandle)
 import           ExHack.Hackage.Hackage   (PackageExports (..),
                                            getPackageExports, getTarballDesc,
                                            unpackHackageTarball)
@@ -22,11 +22,11 @@ import           ExHack.ProcessingSteps   (genGraphDep, generateDb,
                                            saveGraphDep)
 import           ExHack.Types             (CabalFilesDir (..), Config (..),
                                            DatabaseStatus (..), ModuleName,
+                                           PackageDlDesc (..),
                                            PackageFilePath (..),
                                            StackageFile (..), SymName,
                                            TarballsDir (..), WorkDir (..),
-                                           PackageDlDesc(..),
-                                           runStep)
+                                           newDatabaseHandle, runStep)
 
 
 spec :: Spec
@@ -76,7 +76,7 @@ cleanWorkdir = do
     createDirectory workDir
 
 testConf :: Config 'New
-testConf = Config (mkHandle $ workDir </> "test-db.sqlite")
+testConf = Config (newDatabaseHandle $ workDir </> "test-db.sqlite")
                   (StackageFile "")
                   (TarballsDir $ fixturesDir </> "tarballs")
                   (CabalFilesDir  $ fixturesDir </> "cabal")

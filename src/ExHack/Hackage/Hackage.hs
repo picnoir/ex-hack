@@ -25,8 +25,8 @@ import           System.FilePath        (FilePath, (</>))
 import           ExHack.Ghc             (DesugaredModule, getDesugaredMod,
                                          getModExports)
 import           ExHack.ModulePaths     (findComponentRoot)
-import           ExHack.Types           (ComponentRoot (..), ModuleName, MonadLog,
-                                         Package (exposedModules),
+import           ExHack.Types           (ComponentRoot (..), ModuleName,
+                                         MonadLog, Package (exposedModules),
                                          PackageComponent (..),
                                          PackageExports (..),
                                          PackageFilePath (..), TarballDesc (..))

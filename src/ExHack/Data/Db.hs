@@ -4,15 +4,13 @@
 {-# LANGUAGE TypeOperators       #-}
 
 module ExHack.Data.Db (
-    mkHandle,
+    getPkgImportScopes,
     initDb,
-    depGraphAlreadyHere,
-    savePackages,
+    saveModuleExports,
+    saveModuleUnifiedSymbols,
     savePackageDeps,
     savePackageMods,
-    saveModuleExports,
-    getPkgImportScopes,
-    saveModuleUnifiedSymbols
+    savePackages
 ) where
 
 import           Control.Monad.Catch    (Exception, MonadMask, throwM)
@@ -22,8 +20,7 @@ import           Data.Maybe             (listToMaybe, maybe)
 import           Data.Text              (Text, pack)
 import           Database.Selda
 import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
-import           ExHack.Types           (DatabaseHandle, DatabaseStatus (..),
-                                         ImportsScope, IndexedModuleNameT (..),
+import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          IndexedSym (..), LocatedSym (..),
                                          ModuleNameT (..), PackageExports (..),
                                          PackageNameT (..), SourceCodeFile (..),
@@ -32,12 +29,6 @@ import           ExHack.Types           (DatabaseHandle, DatabaseStatus (..),
 import qualified ExHack.Types           as T (Package (..))
 import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
                                          srcSpanStartLine)
-
-mkHandle :: FilePath -> DatabaseHandle 'New
-mkHandle = id
-
-depGraphAlreadyHere :: DatabaseHandle 'New -> DatabaseHandle 'DepsGraph
-depGraphAlreadyHere = id
 
 packageId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text

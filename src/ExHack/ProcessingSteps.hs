@@ -4,15 +4,16 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module ExHack.ProcessingSteps (
-    generateDb,
-    parseStackage,
     dlAssets,
+    generateDb,
     genGraphDep,
-    saveGraphDep,
+    indexSymbols,
+    parseStackage,
     retrievePkgsExports,
-    indexSymbols
+    saveGraphDep
 ) where
 
 import           Control.Lens                   (view)
@@ -55,7 +56,8 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
 import           ExHack.ModulePaths             (toModFilePath)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
-import           ExHack.Types                   (CabalBuildError (..),
+import           ExHack.Types                   (AlterDatabase,
+                                                 CabalBuildError (..),
                                                  CabalFilesDir (..),
                                                  ComponentRoot (..),
                                                  DatabaseHandle,
@@ -66,7 +68,7 @@ import           ExHack.Types                   (CabalBuildError (..),
                                                  LocatedSym (..), ModuleName,
                                                  ModuleNameT (..),
                                                  MonadLog (..), MonadStep,
-                                                 Package (allModules, tarballPath),
+                                                 Package (allComponents, tarballPath),
                                                  PackageComponent (..),
                                                  PackageDlDesc,
                                                  PackageDlDesc (..),
@@ -77,9 +79,9 @@ import           ExHack.Types                   (CabalBuildError (..),
                                                  TarballDesc (..),
                                                  TarballsDir (..),
                                                  UnifiedSym (..), WorkDir (..),
-                                                 getModNameT, getName,
-                                                 getPackageNameT, logInfo,
-                                                 packagedlDescName)
+                                                 getDatabaseHandle, getModNameT,
+                                                 getName, getPackageNameT,
+                                                 logInfo, packagedlDescName)
 import           ExHack.Utils                   (Has (..), foldM')
 
 -- | `Step` 1: database generation.
@@ -89,12 +91,13 @@ import           ExHack.Utils                   (Has (..), foldM')
 generateDb :: forall c m. 
     (Has c (DatabaseHandle 'New), 
      MonadStep c m) 
-    => m (DatabaseHandle 'Initialized)
+    => m (DatabaseHandle (AlterDatabase 'New))
 generateDb = do
     logInfoTitle "[Step 1] Generating database scheme."
-    fp <- asks (view hasLens)
+    dh <- asks (view hasLens) :: m (DatabaseHandle 'New)
+    let (fp, dh') = getDatabaseHandle dh 
     withSQLite fp initDb
-    pure fp
+    pure dh'
 
 -- | `Step` 2: stackage file parsing.
 --
@@ -200,8 +203,9 @@ saveGraphDep :: forall c m.
     => [Package] -> m (DatabaseHandle 'DepsGraph)
 saveGraphDep pkgs = do
     logInfoTitle "[Step 5] Saving dependencies graph."
-    dbHandle <- asks (view hasLens)
-    liftIO $ withSQLite dbHandle $ do
+    dbHandle <- asks (view hasLens) :: m (DatabaseHandle 'Initialized)
+    let (dbFp, dbHandle') = getDatabaseHandle dbHandle
+    liftIO $ withSQLite dbFp $ do
         logInfo "[+] Saving packages to DB (may take some time)..."
         savePackages pkgs
         logInfo "[+] Done."
@@ -211,7 +215,7 @@ saveGraphDep pkgs = do
         foldM_ (foldInsertDep (length pkgs)) 1 pkgs
         logInfo "[+] Done."
         return ()
-    pure dbHandle 
+    pure dbHandle'
   where
     foldInsertDep :: Int -> Int -> Package -> SeldaM Int
     foldInsertDep totalDeps step pkg = handleAll logErrors $ do 
@@ -236,13 +240,14 @@ retrievePkgsExports :: forall c m.
    => [Package] -> m (DatabaseHandle 'PkgExports, [PackageExports])
 retrievePkgsExports pkgs = do
     logInfoTitle "[Step 6] Retrieving modules exports."
-    dbHandle <- asks (view hasLens)
+    dbHandle <- asks (view hasLens) :: m (DatabaseHandle 'DepsGraph)
+    let (dbFp, dbHandle') = getDatabaseHandle dbHandle
     wd <- asks (view hasLens) 
     (_, pkgsExports) <- foldM' (getPkgExports (length pkgs) wd) (1, []) pkgs
     logInfo "[Step 6] Saving modules exports to database."
-    _ <- liftIO $ withSQLite dbHandle $
+    _ <- liftIO $ withSQLite dbFp $
             foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
-    pure (dbHandle, pkgsExports)
+    pure (dbHandle', pkgsExports)
   where
     savePackageModsLogProgress :: Int -> Int -> PackageExports -> SeldaM Int 
     savePackageModsLogProgress !totalSteps !step pe@(PackageExports (p,_,_)) = 
@@ -293,8 +298,9 @@ indexSymbols pkgs = do
     indexPackage :: DatabaseHandle 'PkgExports -> Int -> Int -> PackageExports -> m Int 
     indexPackage !dbh nb cur (PackageExports (p, pfp, _)) = do
         logInfoProgress 7 nb cur $ "Indexing " <> getName p <> " used symbols."
-        is <- liftIO $ withSQLite dbh $ getPkgImportScopes p
-        indexComponent dbh p pfp is `mapM_` allModules p 
+        let (dbFp, _) = getDatabaseHandle dbh
+        is <- liftIO $ withSQLite dbFp $ getPkgImportScopes p
+        indexComponent dbh p pfp is `mapM_` allComponents p 
         pure $ cur + 1
     indexComponent :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
                    -> PackageComponent -> m ()
@@ -318,7 +324,8 @@ indexSymbols pkgs = do
         fileContent <- liftIO $ T.readFile $ toModFilePath pfp cr mn
         let !file = SourceCodeFile fileContent (getModNameT mn) (getPackageNameT p)
             !unsyms = unifySymbols isymsMap syms
-        withSQLite dbh $ saveModuleUnifiedSymbols unsyms file 
+            (dbFp, _) = getDatabaseHandle dbh
+        withSQLite dbFp $ saveModuleUnifiedSymbols unsyms file 
       where
         logErrors e = do
             let (ModuleNameT mnt) = getModNameT mn
