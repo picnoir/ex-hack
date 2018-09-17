@@ -25,7 +25,7 @@ import           System.FilePath        (FilePath, (</>))
 import           ExHack.Ghc             (DesugaredModule, getDesugaredMod,
                                          getModExports)
 import           ExHack.ModulePaths     (findComponentRoot)
-import           ExHack.Types           (ComponentRoot (..), ModuleName,
+import           ExHack.Types           (ComponentRoot (..), ModuleName, MonadLog,
                                          Package (exposedModules),
                                          PackageComponent (..),
                                          PackageExports (..),
@@ -72,14 +72,16 @@ getPackageExports pfp@(PackageFilePath pfps) p = do
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 
-loadExposedModules :: (MonadIO m, MonadThrow m) => PackageFilePath -> Package -> m [(ModuleName, DesugaredModule)] 
+loadExposedModules :: (MonadIO m, MonadThrow m, MonadLog m) 
+                    => PackageFilePath -> Package -> m [(ModuleName, DesugaredModule)] 
 loadExposedModules pfp p = loadModule pfp croots `mapM` maybe mempty mods exMods
     where
         !exMods = exposedModules p 
         croots :: [ComponentRoot]
         !croots = maybe [ComponentRoot "./"] roots exMods
 
-loadModule :: forall m. (MonadIO m, MonadThrow m) => PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
+loadModule :: forall m. (MonadIO m, MonadThrow m, MonadLog m) 
+            => PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
 loadModule pfp croots mn = do
     cr <- findComponentRoot pfp croots mn
     getDesugaredMod pfp cr mn >>= \m -> pure (mn,m)

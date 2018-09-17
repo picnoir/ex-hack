@@ -225,6 +225,10 @@ saveGraphDep pkgs = do
             pure $ step + 1
 
 -- | `Step` 6: extracting and indexing modules exports.
+--
+--   Builds the packages using cabal, load the modules in a 
+--   GHC-API program which extracts the exports and finally save
+--   everything in the ex-hack database.
 retrievePkgsExports :: forall c m.
     (Has c WorkDir,
      Has c (DatabaseHandle 'DepsGraph),
@@ -298,7 +302,7 @@ indexSymbols pkgs = do
             mfps <- findModuleFilePath pfp (roots pc) `mapM` mods pc
             indexModule dbh p pfp is `mapM_` mfps
       where
-        logErrors e = do
+        logErrors e =
             logError $ "[Step 7] ERROR while indexing component " <> T.pack (show pc) <> " from package "
                      <> getName p <> ": " <> T.pack (displayException e)
     indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
