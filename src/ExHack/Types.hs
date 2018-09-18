@@ -1,3 +1,12 @@
+{-|
+Module      : ExHack.Types
+Description : ExHack data types collection.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
+
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFunctor              #-}
@@ -130,7 +139,7 @@ data Package = Package {
   tarballPath :: FilePath,
   -- ^ Local path to the tarball containing the source code of this package.
   -- 
-  -- Invariant: this filepath should **always** point to a valid tarball of this package.
+  -- Invariant: this filepath should __/always/__ point to a valid tarball of this package.
   exposedModules :: Maybe PackageComponent,
   -- ^ Exposed module list if this package exposes a library.
   dbId :: Maybe RowID,
@@ -159,23 +168,41 @@ newtype WorkDir = WorkDir FilePath deriving (Eq, Show)
 --   dataype using the DataKinds GHC extension.
 data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
 
--- | 
+-- | Database file handle wrapper. 
+--
+--   Allows us to bring back a tiny bit of type safety to the database interactions.
 newtype DatabaseHandle (a :: DatabaseStatus) = DatabaseHandle FilePath
     deriving (Eq, Show)
 
+-- | Used in conjunction with `DatabaseHandle` and `getDatabaseHandle`, this type family allow us 
+--   to materialize the application of a database operation.
+--
+--   This is obviously a poor way to design this kind of interaction, but
+--   this is the best effort/refactoring cost ratio I could find.
+--
+--   TODO: delete this family, move the database-related types to the database module
+--   and materialize the database state evolution directly in the database operations functions.
 type family AlterDatabase (a :: DatabaseStatus) :: DatabaseStatus where
     AlterDatabase 'New = 'Initialized
     AlterDatabase 'Initialized = 'DepsGraph
     AlterDatabase 'DepsGraph = 'PkgExports
 
+-- | Extract the database file filepath from the `DatabaseHandle` and assume
+--   an operation will be performed on this handle thus steps the handle's
+--   `DatabaseStatus`.
 getDatabaseHandle :: DatabaseHandle (a :: DatabaseStatus) -> (FilePath, DatabaseHandle (AlterDatabase a))
 getDatabaseHandle (DatabaseHandle fp) = (fp, DatabaseHandle fp)
 
+
+-- | Generates a new database handle given the `FilePath` pointing to the ex-hack
+--   database.
 newDatabaseHandle :: FilePath -> DatabaseHandle 'New
 newDatabaseHandle = DatabaseHandle
 
+-- | YAML file describing a stackage release.
 newtype StackageFile = StackageFile Text deriving (Eq, Show)
 
+-- | ExHack general configuration.
 data Config a = Config {
     _dbHandle :: DatabaseHandle a,
     _stackageFile :: StackageFile,
@@ -261,10 +288,16 @@ newtype IndexedSym = IndexedSym (SymName, Int)
 newtype LocatedSym = LocatedSym (Package, FilePath, GenLocated SrcSpan SymName)
     deriving (Eq)
 
+-- | Symbol having been unified.
+--
+--   Meaning we linked a `LocatedSym` back to an exported `IndexedSym`.
 newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
     deriving (Eq)
 
+-- | Source code of a module in which we found some occurences
+--   of an `IndexedSym`.
 data SourceCodeFile = SourceCodeFile Text ModuleNameT PackageNameT
+
 
 class (Monad m) => MonadLog m where
     logInfo, logError, logInfoTitle :: Text -> m ()
@@ -303,10 +336,15 @@ instance MonadLog SeldaM where
 
 type MonadStep c m = (MonadIO m, MonadMask m, MonadReader c m, MonadLog m)
 
+-- | Processing step monad realization. Used to encapsulate a processing step
+--   together with an application `Config`.
+--
+--   This is basically a RIO monad.
 newtype Step c s a = Step (ReaderT (Config s) IO a)
     deriving (Functor, Applicative, Monad, MonadIO,
               MonadReader (Config s), MonadCatch, MonadThrow, MonadMask)
 
+-- | Runs a processing `Step`.
 runStep :: Step c s a -> Config s -> IO a
 runStep (Step r) = runReaderT r
 
@@ -328,7 +366,8 @@ newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName,
 
 -- | Symbols imported in a module file.
 --
---   This datastructure is optimizing the lookups, allowing 
+--   This datastructure is about optimizing the lookups, allowing us to
+--   release a bit of database pressure.
 type ImportsScope = HM.HashMap IndexedModuleNameT (HS.HashSet IndexedSym) 
 
 packagedlDescName :: PackageDlDesc -> Text
@@ -352,10 +391,15 @@ getPackageNameT p = PackageNameT (getName p)
 -- Exceptions
 -- =================
 
+-- | Exception throwned by the GHC-API code when it cannot locate a
+--   module source file.
 data PackageLoadError = CannotFindModuleFile ModuleName [ComponentRoot]
     deriving (Show)
+
 instance Exception PackageLoadError
 
+-- | Exception throwned when cabal is unable to build a package.
 data CabalBuildError = CabalBuildError Int String
     deriving (Show)
+
 instance Exception CabalBuildError

@@ -1,3 +1,12 @@
+{-|
+Module      : ExHack.StackageTypes
+Description : Stackage-related types.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
@@ -14,8 +23,11 @@ import           Data.Yaml                      (FromJSON (..), withObject,
 import           Distribution.Types.PackageName (PackageName)
 import qualified Distribution.Types.PackageName as C (mkPackageName)
 
+-- | Packages defined in a stackage plan.
 newtype Packages = Packages (Map.Map PackageName PackagePlan) deriving (Show, Eq)
 
+-- | Package plan used by stackage de uniquely identify
+--   a package.
 data PackagePlan = PackagePlan
     { ppVersion     :: Text
     , ppSourceUrl   :: Maybe Text
