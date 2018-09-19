@@ -25,9 +25,9 @@
 </div>
 
 <div id="content">
-<h1>Welcome to ExHack!</h1>
+<h1>The Haskell Examples Database</h1>
 <div id="package-table">
-<input id="package-search" class="search" placeholder="Search package name" />
+  <input id="search" class="search" placeholder="Search for a package name" autocomplete="off" />
 <table id="table" class="fancy row-border order-column compact dataTable no-footer" role="grid"
   <thead>
     <tr role="row">
@@ -39,13 +39,13 @@
   </thead>
   <tbody class="list">
     <tr class="package" role="row">
-      <td><a href="" class="packageName">text</a></td> 
+      <td><a href="/package.html" class="packageName">text</a></td> 
       <td>12</td> 
       <td>A memory efficient text package that you'll love!</td> 
       <td>230</td> 
     </tr>
     <tr class="package" role="row">
-      <td><a href="" class="packageName">babar</a></td> 
+      <td><a href="package.html" class="packageName">babar</a></td> 
       <td>12</td> 
       <td>A memory efficient text package that you'll love!</td> 
       <td>230</td> 
@@ -55,6 +55,12 @@
 </div>
 </div>
 <script src="/static/list.min.js"></script>
-<script src="/static/ex-hack-index.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function(event) {
+    var list = new List('package-table', {
+      valueNames: ['packageName']
+    });
+  });
+</script>
 </body>
 </html>

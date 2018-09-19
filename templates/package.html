@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css" type="text/css" />
+<link rel="icon" type="image/png" href="/static/favicon.png" />
+
+<title>ExHack | Haskell Examples Database</title>
+</head>
+
+<body>
+<div id="page-header">
+
+  <a class="caption" href="/">ExHack :: [Package]</a>
+
+<ul class="links" id="page-menu">
+
+    <li><a href="/browse.html">Browse Package</a></li>
+
+</ul>
+
+</div>
+
+<div id="content">
+<h1>text: Everything Data.Text related in one package</h1>
+<p>Everything <code>Data.Text</code>-related in one package.</p>
+<p>Note: this package follows PVP.</p>
+<h2>Modules</h2>
+<div id="modules">
+<input id="search" class="search" placeholder="Search for a module" autocomplete="off" />
+<div id="module-list">
+  <ul class="list">
+    <li><a href="/module.html" class="moduleName">Data.Text.Internal</a></li>
+    <li><a href="/module.html" class="moduleName">Data.Text.Lazy</a></li>
+    <li><a href="/module.html" class="moduleName">Data.Text.Test</a></li>
+  </ul>
+</div>
+</div>
+<script src="/static/list.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function(event) {
+    var list = new List('modules', {
+      valueNames: ['moduleName']
+    });
+  });
+</script>
+</body>
+</html>
