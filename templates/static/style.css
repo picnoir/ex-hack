@@ -790,7 +790,7 @@ ul.links li form button {
   margin: 0;
 }
 
-#mini #module-list ul {
+#mini #symbol-list #module-list ul {
   list-style: none;
   margin: 0;
 }
@@ -831,7 +831,30 @@ ul.links li form button {
   padding-left: 1em;
 }
 
-#module-list ul {
+#symbol-list {
+	list-style: none;
+}
+
+.symbol-name {
+	
+}
+/* =============*/
+.show {
+      display: none; 
+    }
+    .hide:target + .show {
+          display: inline; 
+        }
+        .hide:target {
+              display: none; 
+            }
+            .hide:target ~ .list {
+                  display:inline; 
+                  }
+
+/* ******** */
+
+#module-list  ul {
   list-style: none;
   margin: 0 0 0 20px;
 
@@ -847,7 +870,7 @@ ul.links li form button {
 }
 
 /* Disable identation for the top level modules */
-#modules #module-list > ul.modules {
+#modules #module-list  > ul.modules {
   margin-left: 0px;
 }
 

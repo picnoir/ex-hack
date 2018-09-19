@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/style.css" type="text/css" />
+<link rel="icon" type="image/png" href="/static/favicon.png" />
+
+<title>ExHack | Haskell Examples Database</title>
+</head>
+
+<body>
+<div id="page-header">
+
+  <a class="caption" href="/">ExHack :: [Package]</a>
+
+<ul class="links" id="page-menu">
+
+    <li><a href="/browse.html">Browse Package</a></li>
+
+</ul>
+
+</div>
+
+<div id="content">
+<h1>Data.Text.Lazy: exported symbols usage examples</h1>
+<h2>Symbols</h2>
+<div id="symbols">
+<input id="search" class="search" placeholder="Search for a symbol" autocomplete="off" />
+<div  class="list">
+<ul id="symbol-list">
+    <li><span class="symbol-name">compareLength</span><span class=occurences>13 occurences</span></li>
+    <li><span class="symbol-name">length</span><span class=occurences>13 occurences</span></li>
+    <li><span class="symbol-name">upper</span><span class=occurences>13 occurences</span></li>
+</ul>
+</div>
+</div>
+<script src="/static/list.min.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function(event) {
+    var list = new List('symbols', {
+      valueNames: ['symbolName']
+    });
+  });
+</script>
+</body>
+</html>
