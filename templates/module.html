@@ -26,14 +26,40 @@
 <h1>Data.Text.Lazy: exported symbols usage examples</h1>
 <h2>Symbols</h2>
 <div id="symbols">
-<input id="search" class="search" placeholder="Search for a symbol" autocomplete="off" />
-<div  class="list">
-<ul id="symbol-list">
-    <li><span class="symbol-name">compareLength</span><span class=occurences>13 occurences</span></li>
-    <li><span class="symbol-name">length</span><span class=occurences>13 occurences</span></li>
-    <li><span class="symbol-name">upper</span><span class=occurences>13 occurences</span></li>
-</ul>
-</div>
+  <input id="search" class="search" placeholder="Search for a symbol" autocomplete="off" />
+  <div class="symbol-list">
+    <ul class="list">
+      <li>
+        <div class="ex">
+        <div class="symbol-occ">
+          <span class="symbolName">compareLength</span>
+          <a id="hide1" class="symbolOccurNb hide" href="#hide1">See 13 Occurences ▼</a><a id="show1" class="symbolOccurNb show" href="#show1">Collapse ◀</a>
+        <div id="occ1" class="details">
+          <div class="example">
+            <p>Control.Monad :: monad</p> <div class="highlight"><pre class="chroma"><code class="language-haskell" data-lang="haskell"><span class="nf">getCabalDynFlagsLib</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">MonadIO</span> <span class="nf">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="nf">m</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">getCabalDynFlagsLib</span> <span class="nf">fp</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="kr">let</span> <span class="nf">qe</span> <span class="ow">=</span> <span class="kt">H</span><span class="o">.</span><span class="nf">mkQueryEnv</span> <span class="nf">fp</span> <span class="p">(</span><span class="nf">fp</span> <span class="o">&lt;/&gt;</span> <span class="s">&#34;dist&#34;</span><span class="p">)</span>
+  <span class="nf">cs</span> <span class="ow">&lt;-</span> <span class="nf">liftIO</span> <span class="o">$</span> <span class="kt">H</span><span class="o">.</span><span class="nf">runQuery</span> <span class="nf">qe</span> <span class="o">$</span> <span class="kt">H</span><span class="o">.</span><span class="nf">components</span> <span class="o">$</span> <span class="p">(,)</span> <span class="o">&lt;$&gt;</span> <span class="kt">H</span><span class="o">.</span><span class="nf">ghcOptions</span>
+  <span class="nf">pure</span> <span class="o">.</span> <span class="nf">fst</span> <span class="o">.</span> <span class="nf">head</span> <span class="o">$</span> <span class="nf">filter</span> <span class="nf">getLib</span> <span class="nf">cs</span>
+    <span class="kr">where</span>
+      <span class="nf">getLib</span> <span class="p">(</span><span class="kr">_</span><span class="p">,</span><span class="kt">H</span><span class="o">.</span><span class="kt">ChLibName</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">True</span>
+      <span class="nf">getLib</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">False</span></code></pre></div></div>
+              <hr/>
+          <div class="example">
+            <p>Data.Bittorent :: tracker</p> <div class="highlight"><pre class="chroma"><code class="language-haskell" data-lang="haskell"><span class="nf">getCabalDynFlagsLib</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">MonadIO</span> <span class="nf">m</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">FilePath</span> <span class="ow">-&gt;</span> <span class="nf">m</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+<span class="nf">getCabalDynFlagsLib</span> <span class="nf">fp</span> <span class="ow">=</span> <span class="kr">do</span>
+  <span class="kr">let</span> <span class="nf">qe</span> <span class="ow">=</span> <span class="kt">H</span><span class="o">.</span><span class="nf">mkQueryEnv</span> <span class="nf">fp</span> <span class="p">(</span><span class="nf">fp</span> <span class="o">&lt;/&gt;</span> <span class="s">&#34;dist&#34;</span><span class="p">)</span>
+  <span class="nf">cs</span> <span class="ow">&lt;-</span> <span class="nf">liftIO</span> <span class="o">$</span> <span class="kt">H</span><span class="o">.</span><span class="nf">runQuery</span> <span class="nf">qe</span> <span class="o">$</span> <span class="kt">H</span><span class="o">.</span><span class="nf">components</span> <span class="o">$</span> <span class="p">(,)</span> <span class="o">&lt;$&gt;</span> <span class="kt">H</span><span class="o">.</span><span class="nf">ghcOptions</span>
+  <span class="nf">pure</span> <span class="o">.</span> <span class="nf">fst</span> <span class="o">.</span> <span class="nf">head</span> <span class="o">$</span> <span class="nf">filter</span> <span class="nf">getLib</span> <span class="nf">cs</span>
+    <span class="kr">where</span>
+      <span class="nf">getLib</span> <span class="p">(</span><span class="kr">_</span><span class="p">,</span><span class="kt">H</span><span class="o">.</span><span class="kt">ChLibName</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">True</span>
+      <span class="nf">getLib</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">False</span></code></pre></div></div>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
 </div>
 <script src="/static/list.min.js"></script>
 <script>
