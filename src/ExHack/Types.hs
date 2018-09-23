@@ -54,6 +54,7 @@ module ExHack.Types (
     UnifiedSym(..),
     WorkDir(..),
     cabalFilesDir,
+    createDirs,
     depsNames,
     fromComponents,
     getDatabaseHandle,
@@ -65,7 +66,6 @@ module ExHack.Types (
     mkVersion,
     newDatabaseHandle,
     packagedlDescName,
-    parseConfig,
     runStep,
     tarballsDir,
     workDir
@@ -87,10 +87,6 @@ import           Data.String                    (IsString)
 import           Data.Text                      (Text, intercalate, length,
                                                  pack, replicate)
 import qualified Data.Text.IO                   as TIO (hPutStrLn, putStrLn)
-import           Data.Yaml                      (FromJSON (..),
-                                                 ParseException (..),
-                                                 decodeFileEither, withObject,
-                                                 (.:))
 import           Database.Selda                 (RowID, SeldaM)
 import           Distribution.ModuleName        (ModuleName (..), components,
                                                  fromComponents)
@@ -200,7 +196,7 @@ newDatabaseHandle :: FilePath -> DatabaseHandle 'New
 newDatabaseHandle = DatabaseHandle
 
 -- | YAML file describing a stackage release.
-newtype StackageFile = StackageFile Text deriving (Eq, Show)
+newtype StackageFile = StackageFile FilePath deriving (Eq, Show)
 
 -- | ExHack general configuration.
 data Config a = Config {
@@ -208,19 +204,9 @@ data Config a = Config {
     _stackageFile :: StackageFile,
     _tarballsDir :: TarballsDir,
     _cabalFilesDir :: CabalFilesDir,
-    _workDir :: WorkDir
+    _workDir :: WorkDir,
+    _createDirs :: Bool
 } deriving (Eq, Show)
-
-instance FromJSON (Config 'New) where
-    parseJSON = withObject "config" $ \v -> Config 
-        <$> (newDatabaseHandle <$> (v .: "db-file"))
-        <*> (StackageFile <$> v .: "stackage-file")
-        <*> (TarballsDir <$> v .: "tarballs-dir")
-        <*> (CabalFilesDir <$> v .: "cabal-files-dir")
-        <*> (WorkDir <$> v .: "work-dir")
-
-parseConfig :: FilePath -> IO (Either ParseException (Config 'New))
-parseConfig = decodeFileEither
 
 makeLenses ''Config
 

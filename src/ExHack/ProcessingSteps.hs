@@ -118,7 +118,8 @@ parseStackage :: forall c m.
     => m [PackageDlDesc]
 parseStackage = do
     logInfoTitle "[Step 2] Parsing Stackage file"
-    (StackageFile stackageYaml) <- asks (view hasLens)
+    (StackageFile stackageFp) <- asks (view hasLens)
+    stackageYaml <- liftIO $ T.readFile stackageFp
     let packages = fromJust $ parseStackageYaml stackageYaml 
     pure $ getHackageUrls packages
 

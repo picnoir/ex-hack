@@ -3,8 +3,8 @@
 
 module Main where
 
-import           Data.Text.IO           (readFile)
-import           Prelude                hiding (readFile)
+import           Options.Applicative    (help, long, metavar, strOption,
+                                         execParser, info, failureCode, value, switch, short)
 import           System.Directory       (XdgDirectory (XdgData),
                                          createDirectoryIfMissing,
                                          getXdgDirectory, listDirectory,
@@ -19,12 +19,11 @@ import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
                                          StackageFile (..), TarballsDir (..),
                                          WorkDir (..), getDatabaseHandle,
-                                         newDatabaseHandle, newDatabaseHandle,
-                                         runStep)
+                                         newDatabaseHandle, runStep)
 
 main :: IO ()
 main = do
-    c <- initConf
+    c <- parseOpts
     dbInit <- shouldBypassDBInit (_dbHandle c) $ runStep generateDb c
     let ci = c {_dbHandle= dbInit} :: Config 'Initialized
     descs <- runStep parseStackage ci
@@ -37,8 +36,8 @@ main = do
     runStep (indexSymbols pe) ce
     pure ()
 
-initConf :: IO (Config 'New)
-initConf = do
+defaultConf :: IO (Config 'New)
+defaultConf = do
     dataDir <- getXdgDirectory XdgData "ex-hack"
     let tarballs = dataDir </> "tarballs"
         cabal    = dataDir </> "cabal-files"
@@ -46,12 +45,12 @@ initConf = do
     createDirectoryIfMissing True tarballs
     createDirectoryIfMissing True cabal
     createDirectoryIfMissing True workdir
-    stackageYaml <- readFile "./data/lts-10.5.yaml"
     pure $ Config (newDatabaseHandle $ dataDir </> "database.sqlite")
-                  (StackageFile stackageYaml) 
+                  (StackageFile "./data/lts-10.5.yaml") 
                   (TarballsDir tarballs) 
                   (CabalFilesDir cabal)
                   (WorkDir workdir)
+                  True
 
 shouldBypassDBInit :: DatabaseHandle 'New -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
 shouldBypassDBInit dbh s =
@@ -82,3 +81,46 @@ promptUser str true false = do
     if null res || head (words res) == "n" || head (words res) == "N"
         then false
         else true
+
+parseOpts :: IO (Config 'New)
+parseOpts = do
+    dataDir <- getXdgDirectory XdgData "ex-hack"
+    let dfttarballs = dataDir </> "tarballs"
+        dftcabal    = dataDir </> "cabal-files"
+        dftworkdir  = dataDir </> "workdir"
+        dftdb       = dataDir </> "database.sqlite"
+    let parser = Config 
+            <$> (newDatabaseHandle <$> strOption
+                (long "database-filepath"
+                <> short 'd'
+                <> value dftdb
+                <> metavar "DB_FILEPATH"
+                <> help "Path to the database file"))
+            <*> (StackageFile <$> strOption
+                (long "stackage-filepath"
+                <> short 's'
+                <> metavar "STACKAGE_FILE"
+                <> help "Stackage build plan file"))
+            <*> (TarballsDir <$> strOption
+                (long "tarballs-directory"
+                <> short 't'
+                <> value dfttarballs
+                <> metavar "TARBALLS_DIR"
+                <> help "Directory in which the tarballs will be downloaded"))
+            <*> (CabalFilesDir <$> strOption
+                (long "cabal-files-directory"
+                <> short 'c'
+                <> value dftcabal
+                <> metavar "CABALFILES_DIR"
+                <> help "Directory in which the cabal files will be downloaded"))
+            <*> (WorkDir <$> strOption
+                (long "working-directory"
+                <> short 'w'
+                <> value dftworkdir
+                <> metavar "WORKDIR"
+                <> help "Directory used to unpack/build the packages"))
+            <*> switch 
+                (long "create-dirs"
+                <> short 'c'
+                <> help "Create the tarball, cabal and working directories if they do not exists on the filesystem")
+    execParser $ info parser (failureCode 1) 
