@@ -4,15 +4,16 @@ $doctype 5
     <body>
         ^{menu}
         <div id="content">
-            <h1>#{pname}: #{pdesc}
-            <h2>Modules
-                <div id="modules">
-                    <input id="search" class="search" placeholder="Search for a module" autocomplete="off">
-                    <div id="module-list">
-                        <ul class="list">
-                            $forall modn <- mods
-                                <li>
-                                    <a href="/module.html" class="moduleName">#{modn}
+            $with (HomePagePackage pname pdesc _ _) <- pack
+                <h1>#{pname}: #{pdesc}
+                <h2>Modules
+                    <div id="modules">
+                        <input id="search" class="search" placeholder="Search for a module" autocomplete="off">
+                        <div id="module-list">
+                            <ul class="list">
+                                $forall modn <- mods
+                                    <li>
+                                        <a href="@{ModulePage pname modn}" class="moduleName">#{modn}
         <script src="/static/list.min.js">
         <script>
             document.addEventListener("DOMContentLoaded", function(event) {

@@ -19,12 +19,12 @@ $doctype 5
                             <th>
                                 <div>Nb Occurences
                     <tbody class="list">
-                        $forall (pname, nbMods, nbOcc) <- packages
+                        $forall HomePagePackage pname pdesc nbMods nbOcc <- packages
                             <tr class="package" role="row">
                                 <td>
-                                    <a href="/package.html" class="packageName">#{pname}
+                                    <a href="@{PackagePage pname}" class="packageName">#{pname}
                                 <td>#{nbMods}
-                                <td>A memory efficient text package that you'll love!
+                                <td>#{pdesc}
                                 <td>#{nbOcc}
         <script src="/static/list.min.js">
         <script>

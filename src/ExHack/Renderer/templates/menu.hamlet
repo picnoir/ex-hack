@@ -1,5 +1,5 @@
 <div id="page-header">
-    <a class="caption" href="/">ExHack :: [Package]
+    <a class="caption" href="@{HomePage}">ExHack :: [Package]
     <ul class="links" id="page-menu">
         <li>
-            <a href="/browse.html"> Browse Package
+            <a href="@{HomePage}"> Browse Packages

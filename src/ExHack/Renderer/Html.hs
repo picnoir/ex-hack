@@ -1,37 +1,49 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module ExHack.Renderer.Html (
     renderHomePage,
     renderModulePage,
     renderPackagePage
 ) where
 
+import           Data.Text   (Text)
 import           Text.Hamlet (HtmlUrl, hamletFile)
 
-type Route = String
+type CodeExample = Text
+type ModuleName  = Text
+type PackageDesc = Text
+type PackageName = Text
+type SymbolName  = Text
 
-getHeader :: String -> HtmlUrl Route
+data Route = 
+    HomePage
+    | PackagePage PackageName
+    | ModulePage PackageName ModuleName
+
+data HomePagePackage = HomePagePackage PackageName PackageDesc Int Int
+
+data SymbolOccurs = SymbolOccurs SymbolName [CodeExample]
+
+getHeader :: Text -> HtmlUrl Route
 getHeader pageTitle = $(hamletFile "./src/ExHack/Renderer/templates/header.hamlet")
 
 menu :: HtmlUrl Route
 menu = $(hamletFile "./src/ExHack/Renderer/templates/menu.hamlet")
 
-renderHomePage :: HtmlUrl Route
-renderHomePage = $(hamletFile "./src/ExHack/Renderer/templates/homePage.hamlet")
-    where
-        packages = undefined :: [(String, String, String)]
-        header   = getHeader "The Haskell Examples Database"
+renderHomePage :: [HomePagePackage] -> HtmlUrl Route
+renderHomePage packages = 
+    $(hamletFile "./src/ExHack/Renderer/templates/homePage.hamlet")
+  where
+    header = getHeader "The Haskell Examples Database"
 
-renderPackagePage :: HtmlUrl Route
-renderPackagePage = $(hamletFile "./src/ExHack/Renderer/templates/packagePage.hamlet")
-    where
-        header = getHeader "Title"
-        mods   = undefined :: [String]
-        pname  = undefined :: String
-        pdesc  = undefined :: String
+renderPackagePage :: HomePagePackage -> [ModuleName] ->  HtmlUrl Route
+renderPackagePage pack@(HomePagePackage pn _ _ _) mods = 
+    $(hamletFile "./src/ExHack/Renderer/templates/packagePage.hamlet")
+  where
+    header = getHeader $ pn <> " usage examples"
 
-renderModulePage :: HtmlUrl Route
-renderModulePage = $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")
-    where
-        header = getHeader "ToTitle"
-        syms = undefined :: [(String, String, String)]
-        mname = undefined :: String
+renderModulePage :: ModuleName -> [SymbolOccurs] -> HtmlUrl Route
+renderModulePage mname soccs = 
+    $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")
+  where
+    header = getHeader "ToTitle"

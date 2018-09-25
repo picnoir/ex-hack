@@ -11,17 +11,18 @@ $doctype 5
                 <div class="symbol-list">
                     <ul class="list">
                         <li>
-                            <div class="ex">
-                                $forall (sname, snbocur, ssourcecode) <- syms 
+                            $forall (SymbolOccurs sname exs) <- soccs
+                                <div class="ex">
                                     <div class="symbol-occ">
                                         <span class="symbolName">#{sname}
                                         <a id="hide#{sname}" class="symbolOccurNb hide" href="#hide#{sname}">
-                                            See #{snbocur} Occurences ▼
+                                            See #{length exs} Occurences ▼
                                         <a id="show#{sname}" class="symbolOccurNb show" href="#show#{sname}">
                                             Collapse ◀
                                         <div id="occ1" class="details">
-                                            <div class="example">
-                                                #{ssourcecode}
+                                            $forall sourceex <- exs 
+                                                <div class="example">
+                                                    #{sourceex}
         <script src="/static/list.min.js"></script>
         <script>
             document.addEventListener("DOMContentLoaded", function(event) {
