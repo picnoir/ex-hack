@@ -1,0 +1,9 @@
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://fonts.googleapis.com/css?family=PT+Sans:400,400i,700" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css" type="text/css">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="search" type="application/opensearchdescription+xml" title="ExHack" href="/packages/opensearch.xml">
+    <title>#{pageTitle} | ExHack
+

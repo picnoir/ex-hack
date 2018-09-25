@@ -63,6 +63,7 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
                                                  getPackageExports,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
+import           ExHack.Renderer.Html           (renderHeader)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
 import           ExHack.Types                   (AlterDatabase,

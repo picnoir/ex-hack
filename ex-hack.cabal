@@ -24,6 +24,7 @@ library
   build-depends:
       ansi-terminal        >= 0.8.0.4,
       base                 >= 4.11,
+      blaze-html           >= 0.9.1.1,
       bytestring           >= 0.10.8.2,
       Cabal                >= 2.2,
       cabal-helper         >= 0.8.1,
@@ -56,6 +57,7 @@ library
       ExHack.Hackage.Hackage,
       ExHack.ModulePaths,
       ExHack.ProcessingSteps,
+      ExHack.Renderer.Html,
       ExHack.Stackage.StackageParser,
       ExHack.Stackage.StackageTypes,
       ExHack.Types,
