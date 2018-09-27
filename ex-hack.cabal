@@ -58,6 +58,7 @@ library
       ExHack.ModulePaths,
       ExHack.ProcessingSteps,
       ExHack.Renderer.Html,
+      ExHack.Renderer.Types,
       ExHack.Stackage.StackageParser,
       ExHack.Stackage.StackageTypes,
       ExHack.Types,

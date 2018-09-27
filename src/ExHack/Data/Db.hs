@@ -12,6 +12,9 @@ Portability : POSIX
 {-# LANGUAGE TypeOperators       #-}
 
 module ExHack.Data.Db (
+    getHomePagePackages,
+    getModulePageSyms,
+    getPackagePageMods,
     getPkgImportScopes,
     initDb,
     saveModuleExports,
@@ -27,17 +30,28 @@ import qualified Data.HashMap.Strict    as HM (fromList)
 import qualified Data.HashSet           as HS (HashSet, fromList)
 import           Data.Maybe             (listToMaybe, maybe)
 import           Data.Text              (Text, pack)
-import           Database.Selda
+import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
+                                         aggregate, autoPrimary, count, def, fk,
+                                         fromRowId, fromSql, groupBy, innerJoin,
+                                         insertWithPK, insert_, literal, query,
+                                         required, restrict, select, table,
+                                         tableWithSelectors, text,
+                                         tryCreateTable, (!), (.&&), (.==))
 import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
+import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
+                                         srcSpanStartLine)
+
+import           ExHack.Renderer.Types  (HomePagePackage (..), ModuleName,
+                                         PackageName, SymbolName,
+                                         SymbolOccurs (..))
 import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          IndexedSym (..), LocatedSym (..),
                                          ModuleNameT (..), PackageExports (..),
                                          PackageNameT (..), SourceCodeFile (..),
-                                         SymName (..), UnifiedSym (..),
-                                         depsNames, getModName, getName)
+                                         SourceCodeFile (..), SymName (..),
+                                         UnifiedSym (..), depsNames, getModName,
+                                         getName)
 import qualified ExHack.Types           as T (Package (..))
-import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
-                                         srcSpanStartLine)
 
 packageId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text
@@ -75,15 +89,20 @@ symModId :: Selector (RowID :*: Text :*: RowID) RowID
 
 sourceFiles :: Table (RowID :*: Text :*: Text :*: Text)
 fileId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
-(sourceFiles, fileId :*: _ :*: _ :*: _)
+fileContent :: Selector (RowID :*: Text :*: Text :*: Text) Text
+(sourceFiles, fileId :*: fileContent :*: _ :*: _)
   = tableWithSelectors "sourceFiles" $
     autoPrimary "id"
     :*: required "fileContent"
     :*: required "modName"
     :*: required "packName"
 
-symbolOccurences :: Table (RowID :*: Int :*: Int :*: RowID :*: RowID)
-(symbolOccurences, _ :*: _ :*: _ :*: _) 
+symbolOccurences :: Table    (RowID :*: Int :*: Int :*: RowID :*: RowID)
+occCol           :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) Int
+occLine          :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) Int
+occFileId        :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) RowID
+occSymId         :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) RowID
+(symbolOccurences, _ :*: occCol :*: occLine :*: occFileId :*: occSymId) 
   = tableWithSelectors "symbolOccurences" $
     autoPrimary "id"
     :*: required "column"
@@ -127,7 +146,7 @@ savePackages :: (MonadSelda m) => [T.Package] -> m ()
 savePackages xs = insert_ packages $
     (\p -> def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p) <$> xs 
 
-data SaveModuleException = PackageNotInDatabase
+data SaveModuleException = PackageNotInDatabase | ModuleNotInDatabase Text 
     deriving (Show)
 
 instance Exception SaveModuleException
@@ -196,9 +215,8 @@ getPkgImportScopes p = do
         let mid = fromSql $ SqlInt i :: RowID
         q <- query $ do
             mods <- select exposedModules 
-            syms <- select exposedSymbols
             restrict (mods ! modId .== literal mid)
-            restrict (syms ! symModId .== mods ! modId)
+            syms <- innerJoin (\s -> s ! symModId .== mods ! modId) $ select exposedSymbols
             pure $ syms ! symId :*: syms ! symName
         pure (mnt, HS.fromList (wrapResult <$> q)) 
     wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId i)
@@ -218,3 +236,61 @@ saveModuleUnifiedSymbols xs (SourceCodeFile f (ModuleNameT mnt) (PackageNameT pn
           !line = srcSpanStartLine loc
           !col = srcSpanStartCol loc
           !sid = fromSql (SqlInt sidi)
+
+-- | Retrieve the data necessary to render the HTML home page.
+getHomePagePackages :: forall m. (MonadSelda m, MonadMask m) => m [HomePagePackage]
+getHomePagePackages = do 
+    res <- query $ aggregate $ do
+        pkgs <- select packages
+        mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
+        pn <- groupBy (pkgs ! packageName)
+        pure $ pn :*: count (mods ! modId)   
+    pure $ wrapResult <$> res 
+  where
+    wrapResult (n :*: c) = HomePagePackage n c
+
+-- | Retrieve the data necessary to render the HTML package page.
+getPackagePageMods :: forall m. (MonadSelda m, MonadMask m) => PackageName -> m [ModuleName]
+getPackagePageMods pname = query $ do
+    pkgs <- select packages
+    restrict $ pkgs ! packageName .== literal pname
+    mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
+    pure $ mods ! modName
+
+-- | Retrieve the data necessary to render the HTML module page.
+getModulePageSyms :: forall m. (MonadSelda m, MonadMask m) => PackageName -> ModuleName -> m [SymbolOccurs]
+getModulePageSyms pname mname = do
+    midm <- queryModId
+    mid <- maybe (throwM $ ModuleNotInDatabase mname) pure midm
+    snames <- query $ do
+        mods <- select exposedModules
+        restrict $ mods ! modId .== literal mid
+        syms <- innerJoin (\s -> s ! symModId .== mods ! modId) $ select exposedSymbols
+        pure $ syms ! symName
+    mapM (\sn -> wrapResult sn <$> querySym mid sn) snames
+  where
+    queryModId :: m (Maybe RowID)
+    queryModId = do
+        res <- query $ do
+            pkgs  <- select packages
+            restrict $ pkgs ! packageName .== literal pname
+            mods  <- innerJoin (\m -> (pkgs ! packageId .== m ! modPack) .&& (m ! modName .== literal mname)) 
+                        $ select exposedModules
+            pure $ mods ! modId 
+        pure $ listToMaybe res
+    querySym :: RowID -> SymbolName -> m [Int :*: Int :*: Text]
+    querySym mid sname = query $ do
+        mods  <- select exposedModules
+        restrict $ mods ! modId .== literal mid
+        syms  <- innerJoin (\s -> (s ! symModId .== mods ! modId) .&& (s ! symName .== literal sname)) 
+                    $ select exposedSymbols
+        occs  <- innerJoin (\o -> o ! occSymId .== syms ! symModId) $ select symbolOccurences
+        files <- innerJoin (\f -> f ! fileId .== occs ! occFileId) $ select sourceFiles
+        pure $ (occs ! occCol) :*: (occs ! occLine) :*: (files ! fileContent) 
+    wrapResult :: SymbolName -> [Int :*: Int :*: Text] -> SymbolOccurs
+    wrapResult sname occs = SymbolOccurs sname (wrapOcc occs)
+    wrapOcc = fmap (\(col :*: line :*: content) -> 
+                    (col, line, SourceCodeFile content (ModuleNameT mname) (PackageNameT pname)))
+
+
+

@@ -6,23 +6,12 @@ module ExHack.Renderer.Html (
     renderPackagePage
 ) where
 
-import           Data.Text   (Text)
-import           Text.Hamlet (HtmlUrl, hamletFile)
+import           Data.Text             (Text)
+import           Text.Hamlet           (HtmlUrl, hamletFile)
 
-type CodeExample = Text
-type ModuleName  = Text
-type PackageDesc = Text
-type PackageName = Text
-type SymbolName  = Text
-
-data Route = 
-    HomePage
-    | PackagePage PackageName
-    | ModulePage PackageName ModuleName
-
-data HomePagePackage = HomePagePackage PackageName PackageDesc Int Int
-
-data SymbolOccurs = SymbolOccurs SymbolName [CodeExample]
+import           ExHack.Renderer.Types (HomePagePackage (..), ModuleName,
+                                        Route (..), SymbolOccurs (..))
+import           ExHack.Types          (SourceCodeFile (..))
 
 getHeader :: Text -> HtmlUrl Route
 getHeader pageTitle = $(hamletFile "./src/ExHack/Renderer/templates/header.hamlet")
@@ -37,13 +26,13 @@ renderHomePage packages =
     header = getHeader "The Haskell Examples Database"
 
 renderPackagePage :: HomePagePackage -> [ModuleName] ->  HtmlUrl Route
-renderPackagePage pack@(HomePagePackage pn _ _ _) mods = 
+renderPackagePage pack@(HomePagePackage pn _) mods = 
     $(hamletFile "./src/ExHack/Renderer/templates/packagePage.hamlet")
   where
     header = getHeader $ pn <> " usage examples"
 
-renderModulePage :: ModuleName -> [SymbolOccurs] -> HtmlUrl Route
-renderModulePage mname soccs = 
+renderModulePage :: HomePagePackage -> ModuleName -> [SymbolOccurs] -> HtmlUrl Route
+renderModulePage _ mname soccs = 
     $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")
   where
-    header = getHeader "ToTitle"
+    header = getHeader $ mname <> " usage examples"

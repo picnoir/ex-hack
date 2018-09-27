@@ -4,8 +4,8 @@ $doctype 5
     <body>
         ^{menu}
         <div id="content">
-            $with (HomePagePackage pname pdesc _ _) <- pack
-                <h1>#{pname}: #{pdesc}
+            $with (HomePagePackage pname _) <- pack
+                <h1>#{pname}
                 <h2>Modules
                     <div id="modules">
                         <input id="search" class="search" placeholder="Search for a module" autocomplete="off">

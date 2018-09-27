@@ -14,18 +14,12 @@ $doctype 5
                                 <div>Package Name
                             <th>
                                 <div>Nb Exported Modules
-                            <th>
-                                <div>Descriptions
-                            <th>
-                                <div>Nb Occurences
                     <tbody class="list">
-                        $forall HomePagePackage pname pdesc nbMods nbOcc <- packages
+                        $forall HomePagePackage pname nbMods <- packages
                             <tr class="package" role="row">
                                 <td>
                                     <a href="@{PackagePage pname}" class="packageName">#{pname}
                                 <td>#{nbMods}
-                                <td>#{pdesc}
-                                <td>#{nbOcc}
         <script src="/static/list.min.js">
         <script>
             document.addEventListener("DOMContentLoaded", function(event) {
