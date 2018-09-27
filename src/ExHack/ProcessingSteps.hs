@@ -19,6 +19,7 @@ module ExHack.ProcessingSteps (
     dlAssets,
     generateDb,
     genGraphDep,
+    generateHtmlPages,
     indexSymbols,
     parseStackage,
     retrievePkgsExports,
@@ -63,7 +64,6 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
                                                  getPackageExports,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
-import           ExHack.Renderer.Html           (renderHeader)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
 import           ExHack.Types                   (AlterDatabase,
@@ -300,20 +300,21 @@ indexSymbols :: forall c m.
      MonadCatch m,
      MonadThrow m,
      Has c (DatabaseHandle 'PkgExports))
-  => [PackageExports] -> m ()
+  => [PackageExports] -> m (DatabaseHandle 'IndexedSyms)
 indexSymbols pkgs = do
     logInfoTitle "[Step 7] Indexing used symbols."
-    dbh <- asks (view hasLens)
-    foldM_ (indexPackage dbh (length pkgs)) 1 pkgs 
+    dbh <- asks (view hasLens) :: m (DatabaseHandle 'PkgExports)
+    let (dbfp, dbh') = getDatabaseHandle dbh
+    foldM_ (indexPackage dbfp (length pkgs)) 1 pkgs 
+    pure dbh'
   where
-    indexPackage :: DatabaseHandle 'PkgExports -> Int -> Int -> PackageExports -> m Int 
-    indexPackage !dbh nb cur (PackageExports (p, pfp, _)) = do
+    indexPackage :: FilePath -> Int -> Int -> PackageExports -> m Int 
+    indexPackage !dbFp nb cur (PackageExports (p, pfp, _)) = do
         logInfoProgress 7 nb cur $ "Indexing " <> getName p <> " used symbols."
-        let (dbFp, _) = getDatabaseHandle dbh
         is <- liftIO $ withSQLite dbFp $ getPkgImportScopes p
-        indexComponent dbh p pfp is `mapM_` allComponents p 
+        indexComponent dbFp p pfp is `mapM_` allComponents p 
         pure $ cur + 1
-    indexComponent :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
+    indexComponent :: FilePath -> Package -> PackageFilePath -> ImportsScope 
                    -> PackageComponent -> m ()
     indexComponent dbh p pfp is pc = handleAll logErrors $ do
             mfps <- findModuleFilePath pfp (roots pc) `mapM` mods pc
@@ -322,9 +323,9 @@ indexSymbols pkgs = do
         logErrors e =
             logError $ "[Step 7] ERROR while indexing component " <> T.pack (show pc) <> " from package "
                      <> getName p <> ": " <> T.pack (displayException e)
-    indexModule :: DatabaseHandle 'PkgExports -> Package -> PackageFilePath -> ImportsScope 
+    indexModule :: FilePath -> Package -> PackageFilePath -> ImportsScope 
                 -> (ModuleName, ComponentRoot) -> m ()
-    indexModule dbh p pfp is (mn,cr) = handleAll logErrors $ do
+    indexModule dbFp p pfp is (mn,cr) = handleAll logErrors $ do
         imports <- getModImports pfp cr mn 
         -- fis: filtered import scope according to this module imports
         -- isyms: imported symbols hashmap on which we will perform the unification
@@ -335,7 +336,6 @@ indexSymbols pkgs = do
         fileContent <- liftIO $ T.readFile $ toModFilePath pfp cr mn
         let !file = SourceCodeFile fileContent (getModNameT mn) (getPackageNameT p)
             !unsyms = unifySymbols isymsMap syms
-            (dbFp, _) = getDatabaseHandle dbh
         withSQLite dbFp $ saveModuleUnifiedSymbols unsyms file 
       where
         logErrors e = do
@@ -352,3 +352,13 @@ indexSymbols pkgs = do
       where
         foldLSym xs ls@(LocatedSym (_, _, locSym)) = 
             maybe xs (\is -> UnifiedSym(is,ls) : xs) (HM.lookup (unLoc locSym) isyms) 
+
+-- | `Step` 8: Generates the HTML documentation using the previously
+--    generated database.
+generateHtmlPages :: forall c m.
+    (MonadStep c m,
+     MonadCatch m,
+     MonadThrow m,
+     Has c (DatabaseHandle 'IndexedSyms))
+  => m ()
+generateHtmlPages = undefined

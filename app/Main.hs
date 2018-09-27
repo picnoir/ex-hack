@@ -3,8 +3,9 @@
 
 module Main where
 
-import           Options.Applicative    (help, long, metavar, strOption,
-                                         execParser, info, failureCode, value, switch, short)
+import           Options.Applicative    (execParser, failureCode, help, info,
+                                         long, metavar, short, strOption,
+                                         switch, value)
 import           System.Directory       (XdgDirectory (XdgData),
                                          createDirectoryIfMissing,
                                          getXdgDirectory, listDirectory,
@@ -13,8 +14,9 @@ import           System.FilePath        ((</>))
 
 
 import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
-                                         indexSymbols, parseStackage,
-                                         retrievePkgsExports, saveGraphDep)
+                                         generateHtmlPages, indexSymbols,
+                                         parseStackage, retrievePkgsExports,
+                                         saveGraphDep)
 import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
                                          StackageFile (..), TarballsDir (..),
@@ -33,7 +35,9 @@ main = do
     let cg = ci {_dbHandle=dbGraph} :: Config 'DepsGraph
     (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
     let ce = cg {_dbHandle=dbExprt} :: Config 'PkgExports
-    runStep (indexSymbols pe) ce
+    dbIdx <- runStep (indexSymbols pe) ce
+    let cidx = ce {_dbHandle=dbIdx} :: Config 'IndexedSyms
+    runStep generateHtmlPages cidx
     pure ()
 
 defaultConf :: IO (Config 'New)

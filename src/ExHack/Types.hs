@@ -119,7 +119,7 @@ newtype ComponentRoot = ComponentRoot FilePath
 --   A same package component source code can be splitted into several
 --   directories AKA. component roots.
 data PackageComponent = PackageComponent {
-    mods :: [ModuleName],
+    mods  :: [ModuleName],
     roots :: [ComponentRoot]
 } deriving (Eq, Show)
 
@@ -162,7 +162,7 @@ newtype WorkDir = WorkDir FilePath deriving (Eq, Show)
 --
 --   This type should be used to parametrize the `DatabaseHandle`
 --   dataype using the DataKinds GHC extension.
-data DatabaseStatus = New | Initialized | DepsGraph | PkgExports
+data DatabaseStatus = New | Initialized | DepsGraph | PkgExports | IndexedSyms
 
 -- | Database file handle wrapper. 
 --
@@ -179,9 +179,10 @@ newtype DatabaseHandle (a :: DatabaseStatus) = DatabaseHandle FilePath
 --   TODO: delete this family, move the database-related types to the database module
 --   and materialize the database state evolution directly in the database operations functions.
 type family AlterDatabase (a :: DatabaseStatus) :: DatabaseStatus where
-    AlterDatabase 'New = 'Initialized
+    AlterDatabase 'New         = 'Initialized
     AlterDatabase 'Initialized = 'DepsGraph
-    AlterDatabase 'DepsGraph = 'PkgExports
+    AlterDatabase 'DepsGraph   = 'PkgExports
+    AlterDatabase 'PkgExports  = 'IndexedSyms
 
 -- | Extract the database file filepath from the `DatabaseHandle` and assume
 --   an operation will be performed on this handle thus steps the handle's
@@ -200,12 +201,12 @@ newtype StackageFile = StackageFile FilePath deriving (Eq, Show)
 
 -- | ExHack general configuration.
 data Config a = Config {
-    _dbHandle :: DatabaseHandle a,
-    _stackageFile :: StackageFile,
-    _tarballsDir :: TarballsDir,
+    _dbHandle      :: DatabaseHandle a,
+    _stackageFile  :: StackageFile,
+    _tarballsDir   :: TarballsDir,
     _cabalFilesDir :: CabalFilesDir,
-    _workDir :: WorkDir,
-    _createDirs :: Bool
+    _workDir       :: WorkDir,
+    _createDirs    :: Bool
 } deriving (Eq, Show)
 
 makeLenses ''Config
@@ -220,6 +221,9 @@ instance Has (Config 'DepsGraph) (DatabaseHandle 'DepsGraph) where
     hasLens = dbHandle
 
 instance Has (Config 'PkgExports) (DatabaseHandle 'PkgExports) where
+    hasLens = dbHandle
+
+instance Has (Config 'IndexedSyms) (DatabaseHandle 'IndexedSyms) where
     hasLens = dbHandle
 
 instance Has (Config a) StackageFile where
