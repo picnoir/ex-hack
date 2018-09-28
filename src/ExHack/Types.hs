@@ -28,6 +28,7 @@ module ExHack.Types (
     Config(..),
     DatabaseHandle,
     DatabaseStatus(..),
+    HtmlDir(..),
     ImportsScope,
     IndexedModuleNameT(..),
     IndexedSym(..),
@@ -62,6 +63,7 @@ module ExHack.Types (
     getModNameT,
     getName,
     getPackageNameT,
+    htmlDir,
     mkPackageName,
     mkVersion,
     newDatabaseHandle,
@@ -158,6 +160,9 @@ newtype CabalFilesDir = CabalFilesDir FilePath deriving (Eq, Show)
 --   packages built.
 newtype WorkDir = WorkDir FilePath deriving (Eq, Show)
 
+-- | Local directory in which the HTML examples database is generated.
+newtype HtmlDir = HtmlDir FilePath deriving (Eq, Show)
+
 -- | Algebraic data type representing the database status.
 --
 --   This type should be used to parametrize the `DatabaseHandle`
@@ -206,6 +211,7 @@ data Config a = Config {
     _tarballsDir   :: TarballsDir,
     _cabalFilesDir :: CabalFilesDir,
     _workDir       :: WorkDir,
+    _htmlDir       :: HtmlDir,
     _createDirs    :: Bool
 } deriving (Eq, Show)
 
@@ -237,6 +243,9 @@ instance Has (Config a) CabalFilesDir where
 
 instance Has (Config a) WorkDir where
     hasLens = workDir
+
+instance Has (Config a) HtmlDir where
+    hasLens = htmlDir
 
 -- | Intermediate package description used till we parse the data necessary
 --   to generate the proper package description.

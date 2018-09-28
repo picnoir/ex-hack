@@ -1,9 +1,17 @@
+{-|
+Module      : ExHack.Renderer.Html
+Description : HTML renderer.
+Copyright   : (c) Félix Baylac-Jacqué, 2018
+License     : GPL-3
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 module ExHack.Renderer.Html (
-    renderHomePage,
-    renderModulePage,
-    renderPackagePage
+    homePageTemplate,
+    modulePageTemplate,
+    packagePageTemplate
 ) where
 
 import           Data.Text             (Text)
@@ -19,20 +27,20 @@ getHeader pageTitle = $(hamletFile "./src/ExHack/Renderer/templates/header.hamle
 menu :: HtmlUrl Route
 menu = $(hamletFile "./src/ExHack/Renderer/templates/menu.hamlet")
 
-renderHomePage :: [HomePagePackage] -> HtmlUrl Route
-renderHomePage packages = 
+homePageTemplate :: [HomePagePackage] -> HtmlUrl Route
+homePageTemplate packages = 
     $(hamletFile "./src/ExHack/Renderer/templates/homePage.hamlet")
   where
     header = getHeader "The Haskell Examples Database"
 
-renderPackagePage :: HomePagePackage -> [ModuleName] ->  HtmlUrl Route
-renderPackagePage pack@(HomePagePackage pn _) mods = 
+packagePageTemplate :: HomePagePackage -> [ModuleName] ->  HtmlUrl Route
+packagePageTemplate pack@(HomePagePackage pn _) mods = 
     $(hamletFile "./src/ExHack/Renderer/templates/packagePage.hamlet")
   where
     header = getHeader $ pn <> " usage examples"
 
-renderModulePage :: HomePagePackage -> ModuleName -> [SymbolOccurs] -> HtmlUrl Route
-renderModulePage _ mname soccs = 
+modulePageTemplate :: HomePagePackage -> ModuleName -> [SymbolOccurs] -> HtmlUrl Route
+modulePageTemplate _ mname soccs = 
     $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")
   where
     header = getHeader $ mname <> " usage examples"

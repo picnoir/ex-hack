@@ -19,9 +19,10 @@ import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
                                          saveGraphDep)
 import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
-                                         StackageFile (..), TarballsDir (..),
-                                         WorkDir (..), getDatabaseHandle,
-                                         newDatabaseHandle, runStep)
+                                         HtmlDir (..), StackageFile (..),
+                                         TarballsDir (..), WorkDir (..),
+                                         getDatabaseHandle, newDatabaseHandle,
+                                         runStep)
 
 main :: IO ()
 main = do
@@ -46,14 +47,17 @@ defaultConf = do
     let tarballs = dataDir </> "tarballs"
         cabal    = dataDir </> "cabal-files"
         workdir  = dataDir </> "workdir"
+        htmldir  = dataDir </> "exhack-dist"
     createDirectoryIfMissing True tarballs
     createDirectoryIfMissing True cabal
     createDirectoryIfMissing True workdir
+    createDirectoryIfMissing True htmldir
     pure $ Config (newDatabaseHandle $ dataDir </> "database.sqlite")
                   (StackageFile "./data/lts-10.5.yaml") 
                   (TarballsDir tarballs) 
                   (CabalFilesDir cabal)
                   (WorkDir workdir)
+                  (HtmlDir htmldir)
                   True
 
 shouldBypassDBInit :: DatabaseHandle 'New -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
@@ -123,6 +127,12 @@ parseOpts = do
                 <> value dftworkdir
                 <> metavar "WORKDIR"
                 <> help "Directory used to unpack/build the packages"))
+            <*> (HtmlDir <$> strOption
+                (long "output-directory"
+                <> short 'w'
+                <> value dftworkdir
+                <> metavar "OUTDIR"
+                <> help "Directory where exhack HTML documentation will be saved"))
             <*> switch 
                 (long "create-dirs"
                 <> short 'c'

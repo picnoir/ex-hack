@@ -18,8 +18,8 @@ Portability : POSIX
 module ExHack.ProcessingSteps (
     dlAssets,
     generateDb,
-    genGraphDep,
     generateHtmlPages,
+    genGraphDep,
     indexSymbols,
     parseStackage,
     retrievePkgsExports,
@@ -43,6 +43,7 @@ import           Data.List                      (foldl')
 import           Data.Maybe                     (fromJust)
 import qualified Data.Text                      as T (pack, unpack)
 import qualified Data.Text.IO                   as T (readFile)
+import qualified Data.Text.Lazy.IO              as TL (writeFile)
 import           Database.Selda                 (SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
 import           Network.HTTP.Client            (Manager, httpLbs,
@@ -51,10 +52,12 @@ import           Network.HTTP.Client            (Manager, httpLbs,
                                                  proxyEnvironment, responseBody)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
 import           System.FilePath                ((<.>), (</>))
+import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
 import           ExHack.Cabal.Cabal             (buildPackage)
 import           ExHack.Cabal.CabalParser       (getSuccParse, parseCabalFile)
-import           ExHack.Data.Db                 (getPkgImportScopes, initDb,
+import           ExHack.Data.Db                 (getHomePagePackages,
+                                                 getPkgImportScopes, initDb,
                                                  saveModuleUnifiedSymbols,
                                                  savePackageDeps,
                                                  savePackageMods, savePackages)
@@ -64,6 +67,8 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
                                                  getPackageExports,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
+import           ExHack.Renderer.Html           (homePageTemplate)
+import           ExHack.Renderer.Types          (renderRoute)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
 import           ExHack.Types                   (AlterDatabase,
@@ -72,7 +77,7 @@ import           ExHack.Types                   (AlterDatabase,
                                                  ComponentRoot (..),
                                                  DatabaseHandle,
                                                  DatabaseStatus (..),
-                                                 ImportsScope,
+                                                 HtmlDir (..), ImportsScope,
                                                  IndexedModuleNameT (..),
                                                  IndexedSym (..),
                                                  LocatedSym (..), ModuleName,
@@ -359,6 +364,15 @@ generateHtmlPages :: forall c m.
     (MonadStep c m,
      MonadCatch m,
      MonadThrow m,
-     Has c (DatabaseHandle 'IndexedSyms))
+     Has c (DatabaseHandle 'IndexedSyms),
+     Has c HtmlDir)
   => m ()
-generateHtmlPages = undefined
+generateHtmlPages = do
+    HtmlDir outfp <- asks (view hasLens) :: m HtmlDir
+    dbh <- asks (view hasLens) :: m (DatabaseHandle 'IndexedSyms)
+    let (dbfp,_) = getDatabaseHandle dbh
+
+    pkgs <- liftIO $ withSQLite dbfp getHomePagePackages
+    let hp = renderHtml $ homePageTemplate pkgs renderRoute
+    _ <- liftIO $ TL.writeFile (outfp </> "index.html") hp
+    pure ()
