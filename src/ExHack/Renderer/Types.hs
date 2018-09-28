@@ -12,23 +12,24 @@ module ExHack.Renderer.Types (
     Col,
     HomePagePackage(..),
     Line,
-    ModuleName,
-    PackageName,
+    ModuleName(..),
+    PackageName(..),
     Route(..),
     SymbolName,
     SymbolOccurs(..),
     renderRoute
 ) where
 
-import           Data.Text    (Text, pack, unpack)
-import           Network.URI  (escapeURIString, isReserved)
-import           Text.Hamlet  (Render)
+import           Data.Text      (Text, pack, unpack)
+import           Database.Selda (RowID)
+import           Network.URI    (escapeURIString, isReserved)
+import           Text.Hamlet    (Render)
 
-import           ExHack.Types (SourceCodeFile (..))
+import           ExHack.Types   (SourceCodeFile (..))
 
-type PackageName = Text
+newtype PackageName = PackageName (RowID, Text)
+newtype ModuleName  = ModuleName (RowID, Text)
 type SymbolName  = Text
-type ModuleName  = Text
 type Col         = Int
 type Line        = Int
 
@@ -50,5 +51,6 @@ escapeUrlSegment = pack . escapeURIString isReserved . unpack
 -- | Render a 'Route' to a proper HTTP URL.
 renderRoute :: Render Route
 renderRoute HomePage _           = "/"
-renderRoute (PackagePage pn)   _ = "/packages/" <> escapeUrlSegment pn <> "/"
-renderRoute (ModulePage pn mn) _ = "/packages/" <> escapeUrlSegment pn <> "/" <> escapeUrlSegment mn <> "/"
+renderRoute (PackagePage (PackageName (_,pn))) _ = "/packages/" <> escapeUrlSegment pn <> "/"
+renderRoute (ModulePage (PackageName (_,pn)) (ModuleName (_,mn))) _ = 
+    "/packages/" <> escapeUrlSegment pn <> "/" <> escapeUrlSegment mn <> "/"

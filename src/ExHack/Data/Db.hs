@@ -36,13 +36,13 @@ import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
                                          insertWithPK, insert_, literal, query,
                                          required, restrict, select, table,
                                          tableWithSelectors, text,
-                                         tryCreateTable, (!), (.&&), (.==))
+                                         tryCreateTable, (!), (.==))
 import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
 import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
                                          srcSpanStartLine)
 
-import           ExHack.Renderer.Types  (HomePagePackage (..), ModuleName,
-                                         PackageName, SymbolName,
+import           ExHack.Renderer.Types  (HomePagePackage (..), ModuleName (..),
+                                         PackageName (..), SymbolName,
                                          SymbolOccurs (..))
 import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          IndexedSym (..), LocatedSym (..),
@@ -243,47 +243,38 @@ getHomePagePackages = do
     res <- query $ aggregate $ do
         pkgs <- select packages
         mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
+        pid <- groupBy (pkgs ! packageId) 
         pn <- groupBy (pkgs ! packageName)
-        pure $ pn :*: count (mods ! modId)   
+        pure $ pid :*: pn :*: count (mods ! modId)   
     pure $ wrapResult <$> res 
   where
-    wrapResult (n :*: c) = HomePagePackage n c
+    wrapResult (i :*: n :*: c) = HomePagePackage (PackageName (i,n)) c
 
 -- | Retrieve the data necessary to render the HTML package page.
 getPackagePageMods :: forall m. (MonadSelda m, MonadMask m) => PackageName -> m [ModuleName]
-getPackagePageMods pname = query $ do
-    pkgs <- select packages
-    restrict $ pkgs ! packageName .== literal pname
-    mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
-    pure $ mods ! modName
+getPackagePageMods (PackageName (pid, _)) = do
+    res <- query $ do
+        pkgs <- select packages
+        restrict $ pkgs ! packageId .== literal pid 
+        mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
+        pure $ mods ! modId :*: mods ! modName
+    pure $ wrapResult <$> res
+  where
+    wrapResult (i :*: n) = ModuleName (i,n)
 
 -- | Retrieve the data necessary to render the HTML module page.
 getModulePageSyms :: forall m. (MonadSelda m, MonadMask m) => PackageName -> ModuleName -> m [SymbolOccurs]
-getModulePageSyms pname mname = do
-    midm <- queryModId
-    mid <- maybe (throwM $ ModuleNotInDatabase mname) pure midm
-    snames <- query $ do
-        mods <- select exposedModules
-        restrict $ mods ! modId .== literal mid
-        syms <- innerJoin (\s -> s ! symModId .== mods ! modId) $ select exposedSymbols
-        pure $ syms ! symName
-    mapM (\sn -> wrapResult sn <$> querySym mid sn) snames
+getModulePageSyms (PackageName (_,pname)) (ModuleName (mid,mname)) = do
+    sids <- query $ do
+        syms <- select exposedSymbols
+        restrict $ syms ! symModId .== literal mid
+        pure $ syms ! symId :*: syms ! symName
+    mapM (\(sid :*: sn) -> wrapResult sn <$> querySym sid) sids
   where
-    queryModId :: m (Maybe RowID)
-    queryModId = do
-        res <- query $ do
-            pkgs  <- select packages
-            restrict $ pkgs ! packageName .== literal pname
-            mods  <- innerJoin (\m -> (pkgs ! packageId .== m ! modPack) .&& (m ! modName .== literal mname)) 
-                        $ select exposedModules
-            pure $ mods ! modId 
-        pure $ listToMaybe res
-    querySym :: RowID -> SymbolName -> m [Int :*: Int :*: Text]
-    querySym mid sname = query $ do
-        mods  <- select exposedModules
-        restrict $ mods ! modId .== literal mid
-        syms  <- innerJoin (\s -> (s ! symModId .== mods ! modId) .&& (s ! symName .== literal sname)) 
-                    $ select exposedSymbols
+    querySym :: RowID -> m [Int :*: Int :*: Text]
+    querySym sid = query $ do
+        syms <- select exposedSymbols
+        restrict $ syms ! symId .== literal sid 
         occs  <- innerJoin (\o -> o ! occSymId .== syms ! symModId) $ select symbolOccurences
         files <- innerJoin (\f -> f ! fileId .== occs ! occFileId) $ select sourceFiles
         pure $ (occs ! occCol) :*: (occs ! occLine) :*: (files ! fileContent) 
@@ -291,6 +282,3 @@ getModulePageSyms pname mname = do
     wrapResult sname occs = SymbolOccurs sname (wrapOcc occs)
     wrapOcc = fmap (\(col :*: line :*: content) -> 
                     (col, line, SourceCodeFile content (ModuleNameT mname) (PackageNameT pname)))
-
-
-

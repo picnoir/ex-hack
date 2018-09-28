@@ -51,12 +51,15 @@ import           Network.HTTP.Client            (Manager, httpLbs,
                                                  parseRequest_,
                                                  proxyEnvironment, responseBody)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
+import           System.Directory               (createDirectoryIfMissing)
 import           System.FilePath                ((<.>), (</>))
 import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
 import           ExHack.Cabal.Cabal             (buildPackage)
 import           ExHack.Cabal.CabalParser       (getSuccParse, parseCabalFile)
 import           ExHack.Data.Db                 (getHomePagePackages,
+                                                 getModulePageSyms,
+                                                 getPackagePageMods,
                                                  getPkgImportScopes, initDb,
                                                  saveModuleUnifiedSymbols,
                                                  savePackageDeps,
@@ -67,8 +70,13 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
                                                  getPackageExports,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
-import           ExHack.Renderer.Html           (homePageTemplate)
-import           ExHack.Renderer.Types          (renderRoute)
+import           ExHack.Renderer.Html           (homePageTemplate,
+                                                 modulePageTemplate,
+                                                 packagePageTemplate)
+import qualified ExHack.Renderer.Types          as RT (HomePagePackage (..),
+                                                       ModuleName (..),
+                                                       PackageName (..),
+                                                       renderRoute)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
 import           ExHack.Types                   (AlterDatabase,
@@ -368,11 +376,29 @@ generateHtmlPages :: forall c m.
      Has c HtmlDir)
   => m ()
 generateHtmlPages = do
+    logInfoTitle "[Step 8] Generating the HTML documentation."
     HtmlDir outfp <- asks (view hasLens) :: m HtmlDir
     dbh <- asks (view hasLens) :: m (DatabaseHandle 'IndexedSyms)
     let (dbfp,_) = getDatabaseHandle dbh
-
     pkgs <- liftIO $ withSQLite dbfp getHomePagePackages
-    let hp = renderHtml $ homePageTemplate pkgs renderRoute
+    let hp = renderHtml $ homePageTemplate pkgs RT.renderRoute
     _ <- liftIO $ TL.writeFile (outfp </> "index.html") hp
-    pure ()
+    foldM_ (generatePackPage dbfp outfp (length pkgs)) 1 pkgs
+  where
+    generatePackPage :: FilePath -> FilePath -> Int -> Int -> RT.HomePagePackage -> m Int
+    generatePackPage !dbfp outfp nbI i hp@(RT.HomePagePackage pack@(RT.PackageName (_,pname)) _) = do
+        expmods <- liftIO $ withSQLite dbfp (getPackagePageMods pack)
+        logInfoProgress 8 nbI i $ "Generating HTML documentation for " <> pname
+        let fp = outfp </> "packages" </> T.unpack pname
+            pp = renderHtml $ packagePageTemplate hp expmods RT.renderRoute
+        liftIO $ createDirectoryIfMissing True fp
+        liftIO $ TL.writeFile (fp </> "index.html") pp
+        generateModPage dbfp fp hp `mapM_` expmods 
+        pure $ i + 1
+    generateModPage :: FilePath -> FilePath -> RT.HomePagePackage -> RT.ModuleName -> m ()
+    generateModPage dbfp packfp hp@(RT.HomePagePackage pack _) modn@(RT.ModuleName (_,modnt)) = do
+        syms <- liftIO $ withSQLite dbfp (getModulePageSyms pack modn)
+        let mp = renderHtml $ modulePageTemplate hp modn syms RT.renderRoute
+            fp = packfp </> T.unpack modnt
+        liftIO $ createDirectoryIfMissing True fp
+        liftIO $ TL.writeFile (fp </> "index.html") mp

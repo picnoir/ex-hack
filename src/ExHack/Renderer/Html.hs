@@ -17,8 +17,9 @@ module ExHack.Renderer.Html (
 import           Data.Text             (Text)
 import           Text.Hamlet           (HtmlUrl, hamletFile)
 
-import           ExHack.Renderer.Types (HomePagePackage (..), ModuleName,
-                                        Route (..), SymbolOccurs (..))
+import           ExHack.Renderer.Types (HomePagePackage (..), ModuleName (..),
+                                        PackageName (..), Route (..),
+                                        SymbolOccurs (..))
 import           ExHack.Types          (SourceCodeFile (..))
 
 getHeader :: Text -> HtmlUrl Route
@@ -34,13 +35,13 @@ homePageTemplate packages =
     header = getHeader "The Haskell Examples Database"
 
 packagePageTemplate :: HomePagePackage -> [ModuleName] ->  HtmlUrl Route
-packagePageTemplate pack@(HomePagePackage pn _) mods = 
+packagePageTemplate pack@(HomePagePackage (PackageName (_,pn)) _) mods = 
     $(hamletFile "./src/ExHack/Renderer/templates/packagePage.hamlet")
   where
     header = getHeader $ pn <> " usage examples"
 
 modulePageTemplate :: HomePagePackage -> ModuleName -> [SymbolOccurs] -> HtmlUrl Route
-modulePageTemplate _ mname soccs = 
+modulePageTemplate _ (ModuleName (_,mname)) soccs = 
     $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")
   where
     header = getHeader $ mname <> " usage examples"
