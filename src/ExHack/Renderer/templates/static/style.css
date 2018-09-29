@@ -199,7 +199,6 @@ ul.links li a, ul.links li form {
 pre {
   padding: 0.5rem 1rem;
   margin: 1em 0;
-  background-color: #f7f7f7;
   overflow: auto;
 }
 
@@ -794,6 +793,10 @@ ul.links li form button {
 
 .symbol-occ {
   transition-delay:0.2s;
+}
+
+.no-occ {
+  float: right;
 }
 
 #mini #symbol-list #module-list ul {

@@ -6,23 +6,40 @@ License     : GPL-3
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 module ExHack.Renderer.Html (
+    highLightCode,
     homePageTemplate,
     modulePageTemplate,
     packagePageTemplate
 ) where
 
-import           Data.Text             (Text)
-import           Text.Hamlet           (HtmlUrl, hamletFile)
+import           Control.Monad.Catch    (MonadMask, throwM)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import qualified Data.Text              as T (Text, pack, unpack)
+import           System.Exit            (ExitCode (..))
+import           System.Process         (readProcessWithExitCode)
+import           Text.Blaze.Html        (preEscapedToHtml)
+import           Text.Hamlet            (HtmlUrl, hamletFile)
 
-import           ExHack.Renderer.Types (HomePagePackage (..), ModuleName (..),
-                                        PackageName (..), Route (..),
-                                        SymbolOccurs (..))
-import           ExHack.Types          (SourceCodeFile (..))
+import           ExHack.Renderer.Types  (HighLightError (..),
+                                         HighlightedSourceCodeFile (..),
+                                         HighlightedSymbolOccurs (..),
+                                         HomePagePackage (..), ModuleName (..),
+                                         PackageName (..), Route (..))
+import           ExHack.Types           (ModuleNameT (..), PackageNameT (..))
 
-getHeader :: Text -> HtmlUrl Route
+highLightCode :: forall m. (MonadIO m, MonadMask m) => T.Text -> m T.Text
+highLightCode t = do
+    (ec,out,err) <- liftIO $ readProcessWithExitCode 
+        "/nix/store/w7p41gs88mkpk8k0bwbgg7bc3970fpbl-python3.6-Pygments-2.2.0/bin/pygmentize" ["-l", "haskell", "-f", "html"] $ T.unpack t
+    case ec of
+        ExitSuccess -> pure $ T.pack out
+        ExitFailure _ -> throwM $ HighLightError err
+
+getHeader :: T.Text -> HtmlUrl Route
 getHeader pageTitle = $(hamletFile "./src/ExHack/Renderer/templates/header.hamlet")
 
 menu :: HtmlUrl Route
@@ -40,7 +57,7 @@ packagePageTemplate pack@(HomePagePackage (PackageName (_,pn)) _) mods =
   where
     header = getHeader $ pn <> " usage examples"
 
-modulePageTemplate :: HomePagePackage -> ModuleName -> [SymbolOccurs] -> HtmlUrl Route
+modulePageTemplate :: HomePagePackage -> ModuleName -> [HighlightedSymbolOccurs] -> HtmlUrl Route
 modulePageTemplate _ (ModuleName (_,mname)) soccs = 
     $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")
   where

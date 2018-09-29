@@ -3,7 +3,7 @@ with import <nixpkgs> {}; rec {
   unstable = import <nixos-unstable> {};
   ExHack = stdenv.mkDerivation {
     name = "ExHack";
-    buildInputs = [ unstable.stack haskell.compiler.ghc843 sqlite gnumake gcc-unwrapped cabal-install zlib ];
+    buildInputs = [ unstable.stack haskell.compiler.ghc843 python36Packages.pygments sqlite gnumake gcc-unwrapped cabal-install zlib ];
   };
 }
 

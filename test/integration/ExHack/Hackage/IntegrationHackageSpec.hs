@@ -4,7 +4,6 @@
 module ExHack.Hackage.IntegrationHackageSpec (spec) where
 
 import           Data.FileEmbed           (embedFile)
-import           Data.List                (isSuffixOf)
 import           Data.Maybe               (fromJust, isNothing)
 import           System.Directory         (createDirectory, makeAbsolute,
                                            removeDirectoryRecursive)
@@ -19,10 +18,10 @@ import           ExHack.Hackage.Hackage   (PackageExports (..),
                                            unpackHackageTarball)
 import           ExHack.ProcessingSteps   (genGraphDep, generateDb,
                                            indexSymbols, retrievePkgsExports,
-                                           saveGraphDep)
+                                           saveGraphDep, generateHtmlPages)
 import           ExHack.Types             (CabalFilesDir (..), Config (..),
-                                           DatabaseStatus (..), ModuleName,
-                                           PackageDlDesc (..),
+                                           DatabaseStatus (..), HtmlDir (..),
+                                           ModuleName, PackageDlDesc (..),
                                            PackageFilePath (..),
                                            StackageFile (..), SymName,
                                            TarballsDir (..), WorkDir (..),
@@ -56,8 +55,8 @@ spec = do
           exports `shouldBe` textExports
     before cleanWorkdir $ describe "processing steps" $
         it "should perform a e2e run with a reduced set of packages" $ do
-            tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/timeit.tar.gz")
-            tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/BiobaseNewick.tar.gz")
+            _ <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/timeit.tar.gz")
+            _ <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/BiobaseNewick.tar.gz")
             let descs = [PackageDlDesc ("text", "dontcare", "dontcare"), 
                          PackageDlDesc ("BiobaseNewick", "dontcare", "dontcare")] 
                 c = testConf :: Config 'New
@@ -68,12 +67,17 @@ spec = do
             let cg = c {_dbHandle=dbGraph} :: Config 'DepsGraph
             (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
             let ce = cg {_dbHandle=dbExprt} :: Config 'PkgExports
-            runStep (indexSymbols pe) ce
+            dbIdx <- runStep (indexSymbols pe) ce
+            let cidx = ce {_dbHandle=dbIdx} :: Config 'IndexedSyms
+            runStep generateHtmlPages cidx
+            pure ()
 
 cleanWorkdir :: IO ()
 cleanWorkdir = do
     removeDirectoryRecursive workDir
+    removeDirectoryRecursive htmlDir
     createDirectory workDir
+    createDirectory htmlDir
 
 testConf :: Config 'New
 testConf = Config (newDatabaseHandle $ workDir </> "test-db.sqlite")
@@ -81,6 +85,11 @@ testConf = Config (newDatabaseHandle $ workDir </> "test-db.sqlite")
                   (TarballsDir $ fixturesDir </> "tarballs")
                   (CabalFilesDir  $ fixturesDir </> "cabal")
                   (WorkDir workDir)
+                  (HtmlDir htmlDir)
+                  True
+
+htmlDir :: FilePath
+htmlDir = "./test/integration/output/"
 
 fixturesDir :: FilePath
 fixturesDir = "./test/integration/fixtures/"

@@ -11,18 +11,25 @@ $doctype 5
                 <div class="symbol-list">
                     <ul class="list">
                         <li>
-                            $forall (SymbolOccurs sname exs) <- soccs
+                            $forall (HighlightedSymbolOccurs sname exs) <- soccs
                                 <div class="ex">
                                     <div class="symbol-occ">
                                         <span class="symbolName">#{sname}
-                                        <a id="hide#{sname}" class="symbolOccurNb hide" href="#hide#{sname}">
-                                            See #{length exs} Occurences ▼
+                                        $if length exs > 0 
+                                            <a id="hide#{sname}" class="symbolOccurNb hide" href="#hide#{sname}">
+                                                See #{length exs} Occurences [+]
+                                        $else
+                                            <span class="no-occ">
+                                                No usage example found for this symbol :(
                                         <a id="show#{sname}" class="symbolOccurNb show" href="#show#{sname}">
-                                            Collapse ◀
+                                            Collapse [-] 
                                         <div id="occ1" class="details">
-                                            $forall (_,_,(SourceCodeFile sourceex _ _)) <- exs 
+                                            $forall (_,_,(HighlightedSourceCodeFile sourceex (ModuleNameT modn) (PackageNameT packn))) <- exs 
+                                                <div>
+                                                   Found in #{modn} from the package #{packn}  
                                                 <div class="example">
-                                                    #{sourceex}
+                                                    #{preEscapedToHtml sourceex}
+                                                <hr>
         <script src="/static/list.min.js"></script>
         <script>
             document.addEventListener("DOMContentLoaded", function(event) {

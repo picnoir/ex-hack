@@ -13,6 +13,7 @@ Portability : POSIX
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeFamilies        #-}
 
 module ExHack.ProcessingSteps (
@@ -33,17 +34,19 @@ import           Control.Monad.Catch            (MonadCatch, MonadThrow,
                                                  throwM)
 import           Control.Monad.IO.Class         (liftIO)
 import           Control.Monad.Reader.Class     (asks)
-import qualified Data.ByteString                as BS (readFile)
+import qualified Data.ByteString                as BS (readFile, writeFile)
 import qualified Data.ByteString.Lazy           as BL (writeFile)
 import qualified Data.HashMap.Strict            as HM (HashMap, elems, empty,
                                                        filterWithKey, insert,
                                                        lookup)
 import qualified Data.HashSet                   as HS (foldl', unions)
+import           Data.FileEmbed                 (embedFile)
 import           Data.List                      (foldl')
 import           Data.Maybe                     (fromJust)
-import qualified Data.Text                      as T (pack, unpack)
+import qualified Data.Text                      as T (pack, unpack, replace)
 import qualified Data.Text.IO                   as T (readFile)
-import qualified Data.Text.Lazy.IO              as TL (writeFile)
+import qualified Data.Text.Lazy                 as TL (Text)
+import qualified Data.Text.Lazy.IO              as TL (writeFile, hPutStr)
 import           Database.Selda                 (SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
 import           Network.HTTP.Client            (Manager, httpLbs,
@@ -52,6 +55,7 @@ import           Network.HTTP.Client            (Manager, httpLbs,
                                                  proxyEnvironment, responseBody)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
 import           System.Directory               (createDirectoryIfMissing)
+import System.IO (withFile, IOMode(WriteMode), hSetEncoding, utf8)
 import           System.FilePath                ((<.>), (</>))
 import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
@@ -70,12 +74,16 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
                                                  getPackageExports,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
-import           ExHack.Renderer.Html           (homePageTemplate,
+import           ExHack.Renderer.Html           (highLightCode,
+                                                 homePageTemplate,
                                                  modulePageTemplate,
                                                  packagePageTemplate)
 import qualified ExHack.Renderer.Types          as RT (HomePagePackage (..),
                                                        ModuleName (..),
                                                        PackageName (..),
+                                                       HighlightedSourceCodeFile(..),
+                                                       HighlightedSymbolOccurs(..),
+                                                       SymbolOccurs(..),
                                                        renderRoute)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
@@ -382,8 +390,12 @@ generateHtmlPages = do
     let (dbfp,_) = getDatabaseHandle dbh
     pkgs <- liftIO $ withSQLite dbfp getHomePagePackages
     let hp = renderHtml $ homePageTemplate pkgs RT.renderRoute
-    _ <- liftIO $ TL.writeFile (outfp </> "index.html") hp
+    liftIO $ withFile 
+                (outfp </> "index.html") 
+                WriteMode 
+                (\h -> hSetEncoding h utf8 >> TL.hPutStr h hp)
     foldM_ (generatePackPage dbfp outfp (length pkgs)) 1 pkgs
+    copyAssets outfp
   where
     generatePackPage :: FilePath -> FilePath -> Int -> Int -> RT.HomePagePackage -> m Int
     generatePackPage !dbfp outfp nbI i hp@(RT.HomePagePackage pack@(RT.PackageName (_,pname)) _) = do
@@ -391,14 +403,47 @@ generateHtmlPages = do
         logInfoProgress 8 nbI i $ "Generating HTML documentation for " <> pname
         let fp = outfp </> "packages" </> T.unpack pname
             pp = renderHtml $ packagePageTemplate hp expmods RT.renderRoute
-        liftIO $ createDirectoryIfMissing True fp
+        liftIO $ do createDirectoryIfMissing True fp
+                    writeUtf8File fp pp
         liftIO $ TL.writeFile (fp </> "index.html") pp
         generateModPage dbfp fp hp `mapM_` expmods 
         pure $ i + 1
     generateModPage :: FilePath -> FilePath -> RT.HomePagePackage -> RT.ModuleName -> m ()
     generateModPage dbfp packfp hp@(RT.HomePagePackage pack _) modn@(RT.ModuleName (_,modnt)) = do
         syms <- liftIO $ withSQLite dbfp (getModulePageSyms pack modn)
-        let mp = renderHtml $ modulePageTemplate hp modn syms RT.renderRoute
-            fp = packfp </> T.unpack modnt
-        liftIO $ createDirectoryIfMissing True fp
-        liftIO $ TL.writeFile (fp </> "index.html") mp
+        hsyms <- highLightOccs syms
+        let mp = renderHtml $ modulePageTemplate hp modn hsyms RT.renderRoute
+            fp = packfp </> T.unpack (T.replace "." "-" modnt)
+        liftIO $ do createDirectoryIfMissing True fp
+                    writeUtf8File fp mp
+    -- | TODO: highlighting shouldn't be performed here but directly when extracted from the DB.
+    --         This hack has been performed in a rush, should be fixed after V0.
+    highLightOccs :: [RT.SymbolOccurs] -> m [RT.HighlightedSymbolOccurs]
+    highLightOccs xs = highSyms `mapM` xs
+        where
+            highSyms (RT.SymbolOccurs sn xs') = do
+                hs <- highSym `mapM` xs'
+                pure $ RT.HighlightedSymbolOccurs sn hs
+            highSym (col, line, SourceCodeFile c p m) = do
+                hc <- handleAll highErr $ highLightCode c
+                pure (col, line, RT.HighlightedSourceCodeFile hc p m)
+              where
+                highErr e = do
+                    logError $ "[Step 8] HIGHLIGHT ERROR " <> T.pack (displayException e)
+                    pure c 
+    copyAssets :: FilePath -> m ()
+    copyAssets fp = do
+        let font = $(embedFile "./src/ExHack/Renderer/templates/static/Inter-UI-Regular.woff") 
+            list = $(embedFile "./src/ExHack/Renderer/templates/static/list.min.js") 
+            style = $(embedFile "./src/ExHack/Renderer/templates/static/style.css") 
+            stat = fp </> "static"
+        liftIO $ do
+            createDirectoryIfMissing True stat
+            BS.writeFile (stat </> "Inter-UI-Regular.woff") font
+            BS.writeFile (stat </> "list.min.js") list 
+            BS.writeFile (stat </> "style.css") style
+    writeUtf8File :: FilePath -> TL.Text -> IO ()
+    writeUtf8File fp txt = 
+        withFile (fp </> "index.html")
+                 WriteMode
+                 (\h -> hSetEncoding h utf8 >> TL.hPutStr h txt)

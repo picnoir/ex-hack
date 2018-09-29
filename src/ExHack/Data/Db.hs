@@ -53,9 +53,9 @@ import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          getName)
 import qualified ExHack.Types           as T (Package (..))
 
-packageId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
+packageId   :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text
-packages :: Table (RowID :*: Text :*: Text :*: Text)
+packages    ::  Table (RowID :*: Text :*: Text :*: Text)
 (packages, packageId :*: packageName :*: _ :*: _) 
   = tableWithSelectors "packages" $
               autoPrimary "packageId"
@@ -70,27 +70,29 @@ dependancies = table "dependancies" $
                    :*: required "depID" `fk` (packages, packageId)
 
 exposedModules :: Table (RowID :*: Text :*: RowID)
-modId :: Selector (RowID :*: Text :*: RowID) RowID
-modName :: Selector (RowID :*: Text :*: RowID) Text
-modPack :: Selector (RowID :*: Text :*: RowID) RowID
+modId          :: Selector (RowID :*: Text :*: RowID) RowID
+modName        :: Selector (RowID :*: Text :*: RowID) Text
+modPack        :: Selector (RowID :*: Text :*: RowID) RowID
 (exposedModules, modId :*: modName :*: modPack) = tableWithSelectors "exposedModules" $
                    autoPrimary "id"
                    :*: required "name"
                    :*: required "packID" `fk` (packages, packageId)
 
 exposedSymbols :: Table (RowID :*: Text :*: RowID)
-symId :: Selector (RowID :*: Text :*: RowID) RowID
-symName :: Selector (RowID :*: Text :*: RowID) Text
-symModId :: Selector (RowID :*: Text :*: RowID) RowID
+symId          :: Selector (RowID :*: Text :*: RowID) RowID
+symName        :: Selector (RowID :*: Text :*: RowID) Text
+symModId       :: Selector (RowID :*: Text :*: RowID) RowID
 (exposedSymbols, symId :*: symName :*: symModId) = tableWithSelectors "exposedSymbols" $
                    autoPrimary "id"
                    :*: required "name"
                    :*: required "modId" `fk` (exposedModules, modId)
 
 sourceFiles :: Table (RowID :*: Text :*: Text :*: Text)
-fileId :: Selector (RowID :*: Text :*: Text :*: Text) RowID
+fileId      :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 fileContent :: Selector (RowID :*: Text :*: Text :*: Text) Text
-(sourceFiles, fileId :*: fileContent :*: _ :*: _)
+fileModule  :: Selector (RowID :*: Text :*: Text :*: Text) Text
+filePackage :: Selector (RowID :*: Text :*: Text :*: Text) Text
+(sourceFiles, fileId :*: fileContent :*: fileModule :*: filePackage)
   = tableWithSelectors "sourceFiles" $
     autoPrimary "id"
     :*: required "fileContent"
@@ -264,21 +266,21 @@ getPackagePageMods (PackageName (pid, _)) = do
 
 -- | Retrieve the data necessary to render the HTML module page.
 getModulePageSyms :: forall m. (MonadSelda m, MonadMask m) => PackageName -> ModuleName -> m [SymbolOccurs]
-getModulePageSyms (PackageName (_,pname)) (ModuleName (mid,mname)) = do
+getModulePageSyms _ (ModuleName (mid,_)) = do
     sids <- query $ do
         syms <- select exposedSymbols
         restrict $ syms ! symModId .== literal mid
         pure $ syms ! symId :*: syms ! symName
     mapM (\(sid :*: sn) -> wrapResult sn <$> querySym sid) sids
   where
-    querySym :: RowID -> m [Int :*: Int :*: Text]
+    querySym :: RowID -> m [Int :*: Int :*: Text :*: Text :*: Text]
     querySym sid = query $ do
         syms <- select exposedSymbols
         restrict $ syms ! symId .== literal sid 
-        occs  <- innerJoin (\o -> o ! occSymId .== syms ! symModId) $ select symbolOccurences
+        occs  <- innerJoin (\o -> o ! occSymId .== syms ! symId) $ select symbolOccurences
         files <- innerJoin (\f -> f ! fileId .== occs ! occFileId) $ select sourceFiles
-        pure $ (occs ! occCol) :*: (occs ! occLine) :*: (files ! fileContent) 
-    wrapResult :: SymbolName -> [Int :*: Int :*: Text] -> SymbolOccurs
+        pure $ (occs ! occCol) :*: (occs ! occLine) :*: (files ! fileContent) :*: (files ! fileModule) :*: (files ! filePackage)
+    wrapResult :: SymbolName -> [Int :*: Int :*: Text :*: Text :*: Text] -> SymbolOccurs
     wrapResult sname occs = SymbolOccurs sname (wrapOcc occs)
-    wrapOcc = fmap (\(col :*: line :*: content) -> 
+    wrapOcc = fmap (\(col :*: line :*: content :*: mname :*: pname) -> 
                     (col, line, SourceCodeFile content (ModuleNameT mname) (PackageNameT pname)))

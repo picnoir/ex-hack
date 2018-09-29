@@ -10,6 +10,9 @@ Portability : POSIX
 
 module ExHack.Renderer.Types (
     Col,
+    HighLightError(..),
+    HighlightedSymbolOccurs(..),
+    HighlightedSourceCodeFile(..),
     HomePagePackage(..),
     Line,
     ModuleName(..),
@@ -20,15 +23,17 @@ module ExHack.Renderer.Types (
     renderRoute
 ) where
 
-import           Data.Text      (Text, pack, unpack)
-import           Database.Selda (RowID)
-import           Network.URI    (escapeURIString, isReserved)
-import           Text.Hamlet    (Render)
+import           Control.Monad.Catch (Exception)
+import           Data.Text           (Text, pack, replace, unpack)
+import           Database.Selda      (RowID)
+import           Network.URI         (escapeURIString, isReserved)
+import           Text.Hamlet         (Render)
 
-import           ExHack.Types   (SourceCodeFile (..))
+import           ExHack.Types        (SourceCodeFile (..), ModuleNameT, PackageNameT)
 
 newtype PackageName = PackageName (RowID, Text)
 newtype ModuleName  = ModuleName (RowID, Text)
+data HighlightedSourceCodeFile = HighlightedSourceCodeFile Text ModuleNameT PackageNameT deriving (Eq, Show)
 type SymbolName  = Text
 type Col         = Int
 type Line        = Int
@@ -42,8 +47,16 @@ data Route =
 -- | Datatype used to populate the home page template.
 data HomePagePackage = HomePagePackage PackageName Int
 
--- | Datatype used to populate the module HTML template.
+-- | Datatype used to populate the module HTML template whith non highlighted code.
 data SymbolOccurs = SymbolOccurs SymbolName [(Col, Line, SourceCodeFile)]
+
+-- | Datatype used to populate the module HTML template whith highlighted code.
+data HighlightedSymbolOccurs = HighlightedSymbolOccurs SymbolName [(Col, Line, HighlightedSourceCodeFile)]
+
+-- | Exception raised during the code highlight process.
+newtype HighLightError = HighLightError String deriving (Eq, Show)
+
+instance Exception HighLightError
 
 escapeUrlSegment :: Text -> Text
 escapeUrlSegment = pack . escapeURIString isReserved . unpack
@@ -53,4 +66,4 @@ renderRoute :: Render Route
 renderRoute HomePage _           = "/"
 renderRoute (PackagePage (PackageName (_,pn))) _ = "/packages/" <> escapeUrlSegment pn <> "/"
 renderRoute (ModulePage (PackageName (_,pn)) (ModuleName (_,mn))) _ = 
-    "/packages/" <> escapeUrlSegment pn <> "/" <> escapeUrlSegment mn <> "/"
+    "/packages/" <> escapeUrlSegment pn <> "/" <> escapeUrlSegment (replace "." "-" mn) <> "/"
