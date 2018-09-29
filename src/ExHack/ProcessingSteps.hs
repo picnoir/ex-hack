@@ -36,17 +36,17 @@ import           Control.Monad.IO.Class         (liftIO)
 import           Control.Monad.Reader.Class     (asks)
 import qualified Data.ByteString                as BS (readFile, writeFile)
 import qualified Data.ByteString.Lazy           as BL (writeFile)
+import           Data.FileEmbed                 (embedFile)
 import qualified Data.HashMap.Strict            as HM (HashMap, elems, empty,
                                                        filterWithKey, insert,
                                                        lookup)
 import qualified Data.HashSet                   as HS (foldl', unions)
-import           Data.FileEmbed                 (embedFile)
 import           Data.List                      (foldl')
 import           Data.Maybe                     (fromJust)
-import qualified Data.Text                      as T (pack, unpack, replace)
+import qualified Data.Text                      as T (pack, replace, unpack)
 import qualified Data.Text.IO                   as T (readFile)
 import qualified Data.Text.Lazy                 as TL (Text)
-import qualified Data.Text.Lazy.IO              as TL (writeFile, hPutStr)
+import qualified Data.Text.Lazy.IO              as TL (hPutStr, writeFile)
 import           Database.Selda                 (SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
 import           Network.HTTP.Client            (Manager, httpLbs,
@@ -55,8 +55,9 @@ import           Network.HTTP.Client            (Manager, httpLbs,
                                                  proxyEnvironment, responseBody)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
 import           System.Directory               (createDirectoryIfMissing)
-import System.IO (withFile, IOMode(WriteMode), hSetEncoding, utf8)
 import           System.FilePath                ((<.>), (</>))
+import           System.IO                      (IOMode (WriteMode),
+                                                 hSetEncoding, utf8, withFile)
 import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
 import           ExHack.Cabal.Cabal             (buildPackage)
@@ -74,16 +75,16 @@ import           ExHack.Hackage.Hackage         (findComponentRoot,
                                                  getPackageExports,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
-import           ExHack.Renderer.Html           (highLightCode,
+import           ExHack.Renderer.Html           (addLineMarker, highLightCode,
                                                  homePageTemplate,
                                                  modulePageTemplate,
                                                  packagePageTemplate)
-import qualified ExHack.Renderer.Types          as RT (HomePagePackage (..),
+import qualified ExHack.Renderer.Types          as RT (HighlightedSourceCodeFile (..),
+                                                       HighlightedSymbolOccurs (..),
+                                                       HomePagePackage (..),
                                                        ModuleName (..),
                                                        PackageName (..),
-                                                       HighlightedSourceCodeFile(..),
-                                                       HighlightedSymbolOccurs(..),
-                                                       SymbolOccurs(..),
+                                                       SymbolOccurs (..),
                                                        renderRoute)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
@@ -426,7 +427,7 @@ generateHtmlPages = do
                 pure $ RT.HighlightedSymbolOccurs sn hs
             highSym (col, line, SourceCodeFile c p m) = do
                 hc <- handleAll highErr $ highLightCode c
-                pure (col, line, RT.HighlightedSourceCodeFile hc p m)
+                pure (col, line, RT.HighlightedSourceCodeFile (addLineMarker line hc) p m)
               where
                 highErr e = do
                     logError $ "[Step 8] HIGHLIGHT ERROR " <> T.pack (displayException e)

@@ -28,7 +28,7 @@ $doctype 5
                                                 <div>
                                                    Found in #{modn} from the package #{packn}  
                                                 <div class="example">
-                                                    #{preEscapedToHtml sourceex}
+                                                   #{preEscapedToHtml sourceex}
                                                 <hr>
         <script src="/static/list.min.js"></script>
         <script>

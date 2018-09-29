@@ -799,6 +799,15 @@ ul.links li form button {
   float: right;
 }
 
+.occ-line::before,
+.occ-line::after {
+  color: red;
+  padding: 1em;
+}
+
+.occ-line::before {content: "=>"}
+.occ-line::after  {content: "<="}
+
 #mini #symbol-list #module-list ul {
   list-style: none;
   margin: 0;

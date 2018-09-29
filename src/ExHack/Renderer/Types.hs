@@ -29,14 +29,16 @@ import           Database.Selda      (RowID)
 import           Network.URI         (escapeURIString, isReserved)
 import           Text.Hamlet         (Render)
 
-import           ExHack.Types        (SourceCodeFile (..), ModuleNameT, PackageNameT)
+import           ExHack.Types        (ModuleNameT, PackageNameT,
+                                      SourceCodeFile (..))
 
-newtype PackageName = PackageName (RowID, Text)
-newtype ModuleName  = ModuleName (RowID, Text)
-data HighlightedSourceCodeFile = HighlightedSourceCodeFile Text ModuleNameT PackageNameT deriving (Eq, Show)
-type SymbolName  = Text
-type Col         = Int
-type Line        = Int
+newtype PackageName            = PackageName (RowID, Text)
+newtype ModuleName             = ModuleName (RowID, Text)
+data HighlightedSourceCodeFile = HighlightedSourceCodeFile 
+                                    Text ModuleNameT PackageNameT deriving (Eq, Show)
+type SymbolName                = Text
+type Col                       = Int
+type Line                      = Int
 
 -- | Renderer's routing datatype
 data Route = 

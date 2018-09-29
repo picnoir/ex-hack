@@ -30,6 +30,7 @@ import qualified Data.HashMap.Strict    as HM (fromList)
 import qualified Data.HashSet           as HS (HashSet, fromList)
 import           Data.Maybe             (listToMaybe, maybe)
 import           Data.Text              (Text, pack)
+import qualified Data.Text              as T (lines, unlines)
 import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
                                          aggregate, autoPrimary, count, def, fk,
                                          fromRowId, fromSql, groupBy, innerJoin,
@@ -51,7 +52,7 @@ import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          SourceCodeFile (..), SymName (..),
                                          UnifiedSym (..), depsNames, getModName,
                                          getName)
-import qualified ExHack.Types           as T (Package (..))
+import qualified ExHack.Types           as ET (Package (..))
 
 packageId   :: Selector (RowID :*: Text :*: Text :*: Text) RowID
 packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text
@@ -130,7 +131,7 @@ initDb = do
 --
 -- You should make sure your package database is already
 -- populated before using this.
-savePackageDeps :: (MonadSelda m) => T.Package -> m ()
+savePackageDeps :: (MonadSelda m) => ET.Package -> m ()
 savePackageDeps p = do
     mpid <- queryPkg p
     let resPackDeps = depsNames p 
@@ -144,9 +145,9 @@ savePackageDeps p = do
       mapM_ (\depId -> insert_ dependancies [ def :*: depId :*: pid ]) (listToMaybe mdid)
 
 -- | Save a package list in the DB.
-savePackages :: (MonadSelda m) => [T.Package] -> m ()
+savePackages :: (MonadSelda m) => [ET.Package] -> m ()
 savePackages xs = insert_ packages $
-    (\p -> def :*: getName p :*: T.cabalFile p :*: (pack . T.tarballPath) p) <$> xs 
+    (\p -> def :*: getName p :*: ET.cabalFile p :*: (pack . ET.tarballPath) p) <$> xs 
 
 data SaveModuleException = PackageNotInDatabase | ModuleNotInDatabase Text 
     deriving (Show)
@@ -159,11 +160,11 @@ instance Exception SaveModuleException
 --   * If the package is not in the DB, something weird happened...
 --     Throw an error
 getPackageId :: forall m. (MonadSelda m, MonadMask m)
-             => T.Package -> m RowID
+             => ET.Package -> m RowID
 getPackageId p = maybe
     (queryPkg p >>= maybe (throwM PackageNotInDatabase) pure)
     pure
-    (T.dbId p)
+    (ET.dbId p)
 
 -- | Save the exposed modules as well as their exposed symbols.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
@@ -182,7 +183,7 @@ saveModuleExports :: (MonadSelda m) => Int -> [SymName] -> m ()
 saveModuleExports midi xs = insert_ exposedSymbols $ 
     (\(SymName s) -> def :*: s :*: fromSql (SqlInt midi)) <$> xs
 
-queryPkg :: (MonadSelda m) => T.Package -> m (Maybe RowID)
+queryPkg :: (MonadSelda m) => ET.Package -> m (Maybe RowID)
 queryPkg p = do
     let r = query $ do
             pks <- select packages
@@ -190,7 +191,7 @@ queryPkg p = do
             return $ pks ! packageId 
     listToMaybe <$> r
 
-getPkgModules :: (MonadSelda m, MonadMask m) => T.Package -> m [IndexedModuleNameT]
+getPkgModules :: (MonadSelda m, MonadMask m) => ET.Package -> m [IndexedModuleNameT]
 getPkgModules p = do
     pid <- getPackageId p
     q <- query $ do
@@ -206,7 +207,7 @@ getPkgModules p = do
 --
 --   This scope should be filtered on a per-module basis, depending on the module
 --   imports, before being used in a symbol unification.
-getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => T.Package -> m ImportsScope
+getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => ET.Package -> m ImportsScope
 getPkgImportScopes p = do
     mods <- getPkgModules p
     o <- sequence (wrapSyms <$> mods)
@@ -279,8 +280,27 @@ getModulePageSyms _ (ModuleName (mid,_)) = do
         restrict $ syms ! symId .== literal sid 
         occs  <- innerJoin (\o -> o ! occSymId .== syms ! symId) $ select symbolOccurences
         files <- innerJoin (\f -> f ! fileId .== occs ! occFileId) $ select sourceFiles
-        pure $ (occs ! occCol) :*: (occs ! occLine) :*: (files ! fileContent) :*: (files ! fileModule) :*: (files ! filePackage)
+        pure $ (occs ! occCol) :*: (occs ! occLine) :*: 
+               (files ! fileContent) :*: (files ! fileModule) :*:
+               (files ! filePackage)
     wrapResult :: SymbolName -> [Int :*: Int :*: Text :*: Text :*: Text] -> SymbolOccurs
     wrapResult sname occs = SymbolOccurs sname (wrapOcc occs)
-    wrapOcc = fmap (\(col :*: line :*: content :*: mname :*: pname) -> 
-                    (col, line, SourceCodeFile content (ModuleNameT mname) (PackageNameT pname)))
+    wrapOcc = fmap 
+                (\(col :*: line :*: content :*: mname :*: pname) -> 
+                    let (nLine, nContent) = extractSample line content
+                     in (col, nLine, 
+                         SourceCodeFile nContent
+                                       (ModuleNameT mname) 
+                                       (PackageNameT pname)))
+
+-- Ahum, not typesafe at all. TODO: create sample-associated datatypes.
+extractSample :: Int -> Text -> (Int, Text)
+extractSample line t = (nLine, T.unlines nText)
+    where
+       !tLines = T.lines t
+       linesBefore = 15
+       linesAfter = 5
+       !nStart = max 0 (line - linesBefore)
+       !nEnd   = min (linesBefore + linesAfter) (length tLines - nStart)
+       !nLine  = linesBefore - 1
+       !nText  = take nEnd $ drop nStart tLines
