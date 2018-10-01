@@ -295,7 +295,7 @@ newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
 
 -- | Source code of a module in which we found some occurences
 --   of an `IndexedSym`.
-data SourceCodeFile = SourceCodeFile Text ModuleNameT PackageNameT
+data SourceCodeFile = SourceCodeFile !Text !ModuleNameT !PackageNameT
 
 
 class (Monad m) => MonadLog m where

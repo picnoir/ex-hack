@@ -302,5 +302,5 @@ extractSample line t = (nLine, T.unlines nText)
        linesAfter = 5
        !nStart = max 0 (line - linesBefore)
        !nEnd   = min (linesBefore + linesAfter) (length tLines - nStart)
-       !nLine  = linesBefore - 1
+       !nLine  = line - nStart
        !nText  = take nEnd $ drop nStart tLines

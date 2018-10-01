@@ -42,12 +42,12 @@ highLightCode t = do
         ExitFailure _ -> throwM $ HighLightError err
 
 addLineMarker :: Int -> T.Text -> T.Text
-addLineMarker line t = let (_, nt) = (\l -> foldr replaceOcc (length l - 1, []) l) $ T.lines t
-                        in T.unlines nt
+addLineMarker line t = T.unlines $ start <> [wrapL (head end)] <> drop 1 end  
   where
-    replaceOcc :: T.Text -> (Int, [T.Text]) -> (Int, [T.Text])
-    replaceOcc x (i, xs) = if i /= line then (i-1, x:xs) else (i-1, (wrapL x):xs)
-    wrapL l = "<span class=\"occ-line\">" <> l <> "</span>"
+    l = T.lines t
+    start = take (line - 1) l
+    end = drop (line - 1) l
+    wrapL txt = "<span class=\"occ-line\">" <> txt <> "</span>" 
 
 getHeader :: T.Text -> HtmlUrl Route
 getHeader pageTitle = $(hamletFile "./src/ExHack/Renderer/templates/header.hamlet")
