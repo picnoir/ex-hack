@@ -266,6 +266,7 @@ saveGraphDep pkgs = do
 --   Builds the packages using cabal, load the modules in a 
 --   GHC-API program which extracts the exports and finally save
 --   everything in the ex-hack database.
+--   TODO: merge those two steps.
 retrievePkgsExports :: forall c m.
     (Has c WorkDir,
      Has c (DatabaseHandle 'DepsGraph),
@@ -350,7 +351,7 @@ indexSymbols pkgs = do
     indexModule dbFp p pfp is (mn,cr) = handleAll logErrors $ do
         imports <- getModImports pfp cr mn 
         -- fis: filtered import scope according to this module imports
-        -- isyms: imported symbols hashmap on which we will perform the unification
+        -- isyms: imported symbols hashsets on which we will perform the unification
         let !fis = HM.filterWithKey (\(IndexedModuleNameT (n, _)) _ -> n `elem` imports) is
             !isyms = HS.unions $ HM.elems fis
             !isymsMap = HS.foldl' (\hm is'@(IndexedSym (n, _)) -> HM.insert n is' hm) HM.empty isyms 

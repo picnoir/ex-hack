@@ -35,9 +35,9 @@ import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
                                          aggregate, autoPrimary, count, def, fk,
                                          fromRowId, fromSql, groupBy, innerJoin,
                                          insertWithPK, insert_, literal, query,
-                                         required, restrict, select, table,
+                                         required, restrict, select,
                                          tableWithSelectors, text,
-                                         tryCreateTable, (!), (.==))
+                                         tryCreateTable, (!), (.==), (.||))
 import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
 import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
                                          srcSpanStartLine)
@@ -65,7 +65,9 @@ packages    ::  Table (RowID :*: Text :*: Text :*: Text)
               :*: required "cabal_file"
 
 dependancies :: Table (RowID :*: RowID :*: RowID)
-dependancies = table "dependancies" $
+depPack :: Selector (RowID :*: RowID :*: RowID) RowID
+depId :: Selector (RowID :*: RowID :*: RowID) RowID
+(dependancies, _ :*: depPack :*: depId) = tableWithSelectors "dependancies" $
                    autoPrimary "id"
                    :*: required "packID" `fk` (packages, packageId)
                    :*: required "depID" `fk` (packages, packageId)
@@ -126,7 +128,7 @@ initDb = do
 
 -- | Save a package dependancies.
 --
--- Note that if we can't a dependancy in the
+-- Note that if we can't find a dependancy in the
 -- packages table, we'll ignore it.
 --
 -- You should make sure your package database is already
@@ -142,7 +144,7 @@ savePackageDeps p = do
         pks <- select packages
         restrict (pks ! packageName .== text (pack d))
         return $ pks ! packageId
-      mapM_ (\depId -> insert_ dependancies [ def :*: depId :*: pid ]) (listToMaybe mdid)
+      mapM_ (\did -> insert_ dependancies [ def :*: pid :*: did]) (listToMaybe mdid)
 
 -- | Save a package list in the DB.
 savePackages :: (MonadSelda m) => [ET.Package] -> m ()
@@ -191,25 +193,14 @@ queryPkg p = do
             return $ pks ! packageId 
     listToMaybe <$> r
 
-getPkgModules :: (MonadSelda m, MonadMask m) => ET.Package -> m [IndexedModuleNameT]
-getPkgModules p = do
-    pid <- getPackageId p
-    q <- query $ do
-        mods <- select exposedModules
-        restrict (mods ! modPack .== literal pid)
-        return (mods ! modId :*: mods ! modName)
-    pure $ wrapResult <$> q 
-  where
-    wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId i)
-
 -- | Query ExHack database to retrieve the available symbols to be imported
 --   from within this package.
 --
 --   This scope should be filtered on a per-module basis, depending on the module
---   imports, before being used in a symbol unification.
+--   imports, before being used in a symbol unification process.
 getPkgImportScopes :: forall m. (MonadSelda m, MonadMask m) => ET.Package -> m ImportsScope
 getPkgImportScopes p = do
-    mods <- getPkgModules p
+    mods <- getScopeModules p
     o <- sequence (wrapSyms <$> mods)
     pure $ HM.fromList o
   where
@@ -223,6 +214,26 @@ getPkgImportScopes p = do
             pure $ syms ! symId :*: syms ! symName
         pure (mnt, HS.fromList (wrapResult <$> q)) 
     wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId i)
+
+getScopeModules :: (MonadSelda m, MonadMask m) => ET.Package -> m [IndexedModuleNameT]
+getScopeModules p = do
+    pid <- getPackageId p
+    q <- query $ do
+        deps <- select dependancies
+        restrict (deps ! depPack .== literal pid)
+        mods <- innerJoin (\m -> m ! modPack .== deps ! depId) $ select exposedModules
+        return (mods ! modId :*: mods ! modName)
+    -- Here, we also want to look for occurences in current's package module.
+    -- Not sure if it's a really good idea: we'll find occurences for sure, but we also
+    -- probably consider the symbol definition as an occurence...
+    qp <- query $ do
+        mods <- select exposedModules
+        restrict $ (mods ! modPack .== literal pid)
+        return (mods ! modId :*: mods ! modName)
+    pure $ (wrapResult <$> q) <> (wrapResult <$> qp) 
+  where
+    wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId i)
+
 
 -- | Insert both the source file in which some symbols have been unified as well as 
 --   the symbols occurences in ExHack's database.
@@ -300,7 +311,12 @@ extractSample line t = (nLine, T.unlines nText)
        !tLines = T.lines t
        linesBefore = 15
        linesAfter = 5
-       !nStart = max 0 (line - linesBefore)
-       !nEnd   = min (linesBefore + linesAfter) (length tLines - nStart)
-       !nLine  = line - nStart
-       !nText  = take nEnd $ drop nStart tLines
+       -- Nb lines to ignore.
+       !toIgnore = max 0 (line - linesBefore)
+       -- Intermediate length, ie init length - ignored lines.
+       !iLength = length tLines - toIgnore
+       -- New line number.
+       !nLine  = line - toIgnore
+       -- Nb lines to take
+       !toTake = min (nLine + linesAfter) iLength
+       !nText  = take toTake $ drop toIgnore tLines

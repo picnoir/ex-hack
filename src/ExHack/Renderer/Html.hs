@@ -21,6 +21,7 @@ import           Control.Monad.Catch    (MonadMask, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.Text              as T (Text, lines, pack, unlines,
                                               unpack)
+import           Safe                   (headMay)
 import           System.Exit            (ExitCode (..))
 import           System.Process         (readProcessWithExitCode)
 import           Text.Blaze.Html        (preEscapedToHtml)
@@ -42,11 +43,12 @@ highLightCode t = do
         ExitFailure _ -> throwM $ HighLightError err
 
 addLineMarker :: Int -> T.Text -> T.Text
-addLineMarker line t = T.unlines $ start <> [wrapL (head end)] <> drop 1 end  
+addLineMarker line t = let slm = headMay end
+    in maybe t (\l -> T.unlines $ start <> [wrapL l] <> drop 1 end) slm  
   where
-    l = T.lines t
-    start = take (line - 1) l
-    end = drop (line - 1) l
+    xs = T.lines t
+    start = take (line - 1) xs
+    end = drop (line - 1) xs
     wrapL txt = "<span class=\"occ-line\">" <> txt <> "</span>" 
 
 getHeader :: T.Text -> HtmlUrl Route
