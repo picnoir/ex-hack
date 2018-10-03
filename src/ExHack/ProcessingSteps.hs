@@ -46,7 +46,7 @@ import           Data.Maybe                     (fromJust)
 import qualified Data.Text                      as T (pack, replace, unpack)
 import qualified Data.Text.IO                   as T (readFile)
 import qualified Data.Text.Lazy                 as TL (Text)
-import qualified Data.Text.Lazy.IO              as TL (hPutStr, writeFile)
+import qualified Data.Text.Lazy.IO              as TL (hPutStr)
 import           Database.Selda                 (SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
 import           Network.HTTP.Client            (Manager, httpLbs,
@@ -61,7 +61,7 @@ import           System.IO                      (IOMode (WriteMode),
 import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
 import           ExHack.Cabal.Cabal             (buildPackage)
-import           ExHack.Cabal.CabalParser       (getSuccParse, parseCabalFile)
+import           ExHack.Cabal.CabalParser       (parseCabalFile, runParseResult)
 import           ExHack.Data.Db                 (getHomePagePackages,
                                                  getModulePageSyms,
                                                  getPackagePageMods,
@@ -205,17 +205,18 @@ genGraphDep pd = do
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
     logInfo "[+] Parsing cabal files."
-    (_,pkgs) <- foldM' (readPkgsFiles cd tbd (length pd)) (1,[]) pd
-    pure $ getSuccParse (parseCabalFile <$> pkgs)
+    (_, !pkgs) <- foldM' (readPkgsFiles cd tbd (length pd)) (1,[]) pd
+    pure pkgs
   where
-    readPkgsFiles :: CabalFilesDir -> TarballsDir -> Int -> (Int, [TarballDesc])
-                  -> PackageDlDesc -> m (Int, [TarballDesc])
     readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) !totalSteps (!step, xs) p = 
         handleAll logErrors $ do
             logInfoProgress 4 totalSteps step $ "Reading " <> packagedlDescName p <> " cabal file."
             let tp = tarballsDir </> T.unpack (packagedlDescName p) <.> "tar.gz"
-            cf <- liftIO $ T.readFile $ cabalFilesDir </> T.unpack (packagedlDescName p) <.> "cabal"
-            pure (step + 1, TarballDesc (tp,cf) : xs)
+            !cf <- liftIO $ T.readFile $ cabalFilesDir </> T.unpack (packagedlDescName p) <.> "cabal"
+            let !pack = parseCabalFile $ TarballDesc (tp,cf)
+            case runParseResult pack of
+                (_, Left _)   -> pure (step + 1, xs)
+                (_, Right x) -> pure (step + 1, x:xs)
       where
         logErrors e = do
             logError $ "[Step 4] ERROR cannot read " <> packagedlDescName p
@@ -301,7 +302,7 @@ retrievePkgsExports pkgs = do
         pfp <- unpackHackageTarball wd tb
         cr <- buildPackage pfp
         maybe (pure ()) (\(errCode, errStr) -> throwM $ CabalBuildError errCode errStr) cr 
-        x <- getPackageExports pfp p
+        !x <- getPackageExports pfp p
         pure (nb + 1,  x : xs)
       where
         logErrors e = do
@@ -400,16 +401,21 @@ generateHtmlPages = do
     copyAssets outfp
   where
     generatePackPage :: FilePath -> FilePath -> Int -> Int -> RT.HomePagePackage -> m Int
-    generatePackPage !dbfp outfp nbI i hp@(RT.HomePagePackage pack@(RT.PackageName (_,pname)) _) = do
-        expmods <- liftIO $ withSQLite dbfp (getPackagePageMods pack)
-        logInfoProgress 8 nbI i $ "Generating HTML documentation for " <> pname
-        let fp = outfp </> "packages" </> T.unpack pname
-            pp = renderHtml $ packagePageTemplate hp expmods RT.renderRoute
-        liftIO $ do createDirectoryIfMissing True fp
-                    writeUtf8File fp pp
-        liftIO $ TL.writeFile (fp </> "index.html") pp
-        generateModPage dbfp fp hp `mapM_` expmods 
-        pure $ i + 1
+    generatePackPage !dbfp outfp nbI i hp@(RT.HomePagePackage pack@(RT.PackageName (_,pname)) _) =
+        handleAll logErrors $ do
+            expmods <- liftIO $ withSQLite dbfp (getPackagePageMods pack)
+            logInfoProgress 8 nbI i $ "Generating HTML documentation for " <> pname
+            let fp = outfp </> "packages" </> T.unpack pname
+                pp = renderHtml $ packagePageTemplate hp expmods RT.renderRoute
+            liftIO $ do createDirectoryIfMissing True fp
+                        writeUtf8File fp pp
+            generateModPage dbfp fp hp `mapM_` expmods 
+            pure $ i + 1
+      where
+        logErrors e = do
+            logError $ "[Step 7] ERROR while generating " <> pname <> 
+                " HTML documentation: " <> T.pack (displayException e) 
+            pure $ i + 1 
     generateModPage :: FilePath -> FilePath -> RT.HomePagePackage -> RT.ModuleName -> m ()
     generateModPage dbfp packfp hp@(RT.HomePagePackage pack _) modn@(RT.ModuleName (_,modnt)) = do
         syms <- liftIO $ withSQLite dbfp (getModulePageSyms pack modn)

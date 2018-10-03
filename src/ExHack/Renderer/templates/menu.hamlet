@@ -1,5 +1,5 @@
 <div id="page-header">
-    <a class="caption" href="@{HomePage}">ExHack :: [Package]
+    <a class="caption" href="@{HomePage}">ExHack :: Haskell (ExamplesDatabase) 
     <ul class="links" id="page-menu">
         <li>
             <a href="@{HomePage}"> Browse Packages

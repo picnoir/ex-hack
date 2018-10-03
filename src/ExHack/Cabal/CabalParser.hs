@@ -8,7 +8,6 @@ Portability : POSIX
 -}
 module ExHack.Cabal.CabalParser (
   parseCabalFile,
-  getSuccParse,
   runParseResult
 ) where
 
@@ -49,14 +48,6 @@ import           ExHack.Types                                 (ComponentRoot (..
                                                                PackageName,
                                                                TarballDesc (..),
                                                                pkgName)
-
--- | Filtering out the parse failures from a `ParseResult` list.
-getSuccParse :: [ParseResult Package] -> [Package]
-getSuccParse = foldr appendParseResult [] 
-    where
-      appendParseResult pr xs = case runParseResult pr of
-                                    (_, Left _) -> xs
-                                    (_, Right x) -> x:xs
 
 -- | Parse a cabalFile into a `Package`
 --

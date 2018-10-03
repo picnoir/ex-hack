@@ -1,8 +1,11 @@
+{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
+import           Control.Lens.Getter    ((^.))
+import           Control.Monad          (when)
 import           Options.Applicative    (execParser, failureCode, help, info,
                                          long, metavar, short, strOption,
                                          switch, value)
@@ -11,6 +14,8 @@ import           System.Directory       (XdgDirectory (XdgData),
                                          getXdgDirectory, listDirectory,
                                          removeDirectoryRecursive)
 import           System.FilePath        ((</>))
+import           System.IO              (BufferMode (NoBuffering),
+                                         hSetBuffering, stdin, stdout)
 
 
 import           ExHack.ProcessingSteps (dlAssets, genGraphDep, generateDb,
@@ -21,17 +26,22 @@ import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
                                          HtmlDir (..), StackageFile (..),
                                          TarballsDir (..), WorkDir (..),
-                                         getDatabaseHandle, newDatabaseHandle,
-                                         runStep)
+                                         cabalFilesDir, createDirs,
+                                         getDatabaseHandle, htmlDir,
+                                         newDatabaseHandle, runStep,
+                                         tarballsDir, workDir)
 
 main :: IO ()
 main = do
+    hSetBuffering stdin NoBuffering
+    hSetBuffering stdout NoBuffering
     c <- parseOpts
+    when (c ^. createDirs) (createConfigDirs c)
     dbInit <- shouldBypassDBInit (_dbHandle c) $ runStep generateDb c
-    let ci = c {_dbHandle= dbInit} :: Config 'Initialized
+    let ci = c {_dbHandle= dbInit}  :: Config 'Initialized
     descs <- runStep parseStackage ci
     shouldBypassAssetsDl (_tarballsDir c) (_cabalFilesDir c) $ runStep (dlAssets descs) ci 
-    pkgs <- runStep (genGraphDep descs) ci
+    !pkgs <- runStep (genGraphDep descs) ci
     dbGraph <- shouldBypassGraphDepsGen dbInit $ runStep (saveGraphDep pkgs) ci
     let cg = ci {_dbHandle=dbGraph} :: Config 'DepsGraph
     (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
@@ -41,24 +51,16 @@ main = do
     runStep generateHtmlPages cidx
     pure ()
 
-defaultConf :: IO (Config 'New)
-defaultConf = do
-    dataDir <- getXdgDirectory XdgData "ex-hack"
-    let tarballs = dataDir </> "tarballs"
-        cabal    = dataDir </> "cabal-files"
-        workdir  = dataDir </> "workdir"
-        htmldir  = dataDir </> "exhack-dist"
-    createDirectoryIfMissing True tarballs
-    createDirectoryIfMissing True cabal
-    createDirectoryIfMissing True workdir
-    createDirectoryIfMissing True htmldir
-    pure $ Config (newDatabaseHandle $ dataDir </> "database.sqlite")
-                  (StackageFile "./data/lts-10.5.yaml") 
-                  (TarballsDir tarballs) 
-                  (CabalFilesDir cabal)
-                  (WorkDir workdir)
-                  (HtmlDir htmldir)
-                  True
+createConfigDirs :: Config 'New -> IO ()
+createConfigDirs c = do
+    let TarballsDir tbd   = c ^. tarballsDir
+        CabalFilesDir cbd = c ^. cabalFilesDir
+        WorkDir wd        = c ^. workDir
+        HtmlDir htd       = c ^. htmlDir
+    createDirectoryIfMissing True tbd
+    createDirectoryIfMissing True cbd
+    createDirectoryIfMissing True wd
+    createDirectoryIfMissing True htd
 
 shouldBypassDBInit :: DatabaseHandle 'New -> IO (DatabaseHandle 'Initialized) -> IO (DatabaseHandle 'Initialized)
 shouldBypassDBInit dbh s =
@@ -135,6 +137,6 @@ parseOpts = do
                 <> help "Directory where exhack HTML documentation will be saved"))
             <*> switch 
                 (long "create-dirs"
-                <> short 'c'
+                <> short 'n'
                 <> help "Create the tarball, cabal and working directories if they do not exists on the filesystem")
     execParser $ info parser (failureCode 1) 

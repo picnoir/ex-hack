@@ -37,7 +37,7 @@ import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
                                          insertWithPK, insert_, literal, query,
                                          required, restrict, select,
                                          tableWithSelectors, text,
-                                         tryCreateTable, (!), (.==), (.||))
+                                         tryCreateTable, (!), (.==))
 import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
 import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
                                          srcSpanStartLine)
