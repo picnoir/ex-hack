@@ -44,9 +44,9 @@ main = do
     !pkgs <- runStep (genGraphDep descs) ci
     dbGraph <- shouldBypassGraphDepsGen dbInit $ runStep (saveGraphDep pkgs) ci
     let cg = ci {_dbHandle=dbGraph} :: Config 'DepsGraph
-    (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
+    dbExprt <- runStep (retrievePkgsExports pkgs) cg
     let ce = cg {_dbHandle=dbExprt} :: Config 'PkgExports
-    dbIdx <- runStep (indexSymbols pe) ce
+    dbIdx <- runStep (indexSymbols pkgs) ce
     let cidx = ce {_dbHandle=dbIdx} :: Config 'IndexedSyms
     runStep generateHtmlPages cidx
     pure ()

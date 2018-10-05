@@ -50,14 +50,14 @@ spec = do
           _ <- buildPackage tbp
           pd <- getPackageDesc tbp
           let p = fromJust $ parseCabalFile $ fromJust pd 
-          (PackageExports (_, _, exports)) <- getPackageExports tbp p
+          (PackageExports _ _ exports) <- getPackageExports tbp p
           exports `shouldBe` [("System.TimeIt", ["timeIt", "timeItT"])]
         it "should retrieve text exports" $ do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/text.tar.gz")
           _ <- buildPackage tbp
           pd <- getPackageDesc tbp
           let p = fromJust $ parseCabalFile $ fromJust pd
-          (PackageExports (_,_,exports)) <- getPackageExports tbp p
+          (PackageExports _ _ exports) <- getPackageExports tbp p
           exports `shouldBe` textExports
     before cleanWorkdir $ describe "processing steps" $
         it "should perform a e2e run with a reduced set of packages" $ do
@@ -71,9 +71,9 @@ spec = do
             pkgs <- runStep (genGraphDep descs) ci
             dbGraph <- runStep (saveGraphDep pkgs) ci
             let cg = c {_dbHandle=dbGraph} :: Config 'DepsGraph
-            (dbExprt,pe) <- runStep (retrievePkgsExports pkgs) cg
+            dbExprt <- runStep (retrievePkgsExports pkgs) cg
             let ce = cg {_dbHandle=dbExprt} :: Config 'PkgExports
-            dbIdx <- runStep (indexSymbols pe) ce
+            dbIdx <- runStep (indexSymbols pkgs) ce
             let cidx = ce {_dbHandle=dbIdx} :: Config 'IndexedSyms
             runStep generateHtmlPages cidx
             pure ()

@@ -372,7 +372,7 @@ runStep (Step r) = runReaderT r
 -- * For each module:
 --     * A name.
 --     * A list containing the exported symbols.
-newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName, [SymName])])
+data PackageExports = PackageExports Package PackageFilePath [(ModuleName, [SymName])]
   deriving (Show, Eq, Generic)
 instance NFData PackageExports 
 

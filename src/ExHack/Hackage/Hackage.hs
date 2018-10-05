@@ -46,7 +46,7 @@ unpackHackageTarball dir tb = do
 getPackageExports :: (MonadIO m) => PackageFilePath -> Package -> m PackageExports
 getPackageExports pfp@(PackageFilePath pfps) p = do
   em <- liftIO $ withCurrentDirectory pfps (loadExposedModules pfp p)
-  pure $ PackageExports (p, pfp, getExports <$> em)
+  pure $ PackageExports p pfp (getExports <$> em)
     where
       getExports (mn, dm) = (mn, getModExports dm) 
 

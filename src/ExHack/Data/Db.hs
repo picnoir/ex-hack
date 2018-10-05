@@ -168,7 +168,7 @@ getPackageId p = maybe
 -- | Save the exposed modules as well as their exposed symbols.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
                 => PackageExports -> m ()
-savePackageMods (PackageExports (p, _, xs)) = do
+savePackageMods (PackageExports p _ xs) = do
     pid <- getPackageId p
     saveMod pid `mapM_` xs
   where

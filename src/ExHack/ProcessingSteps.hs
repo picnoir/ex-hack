@@ -278,7 +278,7 @@ saveGraphDep pkgs = do
 retrievePkgsExports :: forall c m.
     (Has c (DatabaseHandle 'DepsGraph),
      MonadStep c m)
-   => [Package] -> m (DatabaseHandle 'PkgExports, [PackageExports])
+   => [Package] -> m (DatabaseHandle 'PkgExports)
 retrievePkgsExports pkgs = do
     logInfoTitle "[Step 6] Retrieving modules exports."
     dbHandle <- asks (view hasLens) :: m (DatabaseHandle 'DepsGraph)
@@ -287,10 +287,10 @@ retrievePkgsExports pkgs = do
     logInfo "[Step 6] Saving modules exports to database."
     _ <- liftIO $ withSQLite dbFp $
             foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
-    pure (dbHandle', pkgsExports)
+    pure (dbHandle')
   where
     savePackageModsLogProgress :: Int -> Int -> PackageExports -> SeldaM Int 
-    savePackageModsLogProgress !totalSteps !step pe@(PackageExports (p,_,_)) = 
+    savePackageModsLogProgress !totalSteps !step pe@(PackageExports p _ _) = 
         handleAll logErrors $ do
             logInfoProgress 6 totalSteps step $ "Saving " <> getName p <> " exports to database."
             savePackageMods pe
@@ -328,7 +328,7 @@ indexSymbols :: forall c m.
      MonadCatch m,
      MonadThrow m,
      Has c (DatabaseHandle 'PkgExports))
-  => [PackageExports] -> m (DatabaseHandle 'IndexedSyms)
+  => [Package] -> m (DatabaseHandle 'IndexedSyms)
 indexSymbols pkgs = do
     logInfoTitle "[Step 7] Indexing used symbols."
     dbh <- asks (view hasLens) :: m (DatabaseHandle 'PkgExports)
@@ -336,11 +336,11 @@ indexSymbols pkgs = do
     foldM_ (indexPackage dbfp (length pkgs)) 1 pkgs 
     pure dbh'
   where
-    indexPackage :: FilePath -> Int -> Int -> PackageExports -> m Int 
-    indexPackage !dbFp nb cur (PackageExports (p, pfp, _)) = do
+    indexPackage :: FilePath -> Int -> Int -> Package -> m Int 
+    indexPackage !dbFp nb cur p = do
         logInfoProgress 7 nb cur $ "Indexing " <> getName p <> " used symbols."
         is <- liftIO $ withSQLite dbFp $ getPkgImportScopes p
-        indexComponent dbFp p pfp is `mapM_` allComponents p 
+        indexComponent dbFp p (packageFilePath p) is `mapM_` allComponents p 
         pure $ cur + 1
     indexComponent :: FilePath -> Package -> PackageFilePath -> ImportsScope 
                    -> PackageComponent -> m ()
