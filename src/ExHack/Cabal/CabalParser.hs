@@ -6,12 +6,14 @@ License     : GPL-3
 Stability   : experimental
 Portability : POSIX
 -}
+{-# LANGUAGE BangPatterns #-}
 module ExHack.Cabal.CabalParser (
-  parseCabalFile,
-  runParseResult
+  parseCabalFile
 ) where
 
-import           Data.Maybe                                   (maybeToList)
+import Control.DeepSeq (force)
+import           Data.Maybe                                   (fromMaybe,
+                                                               maybeToList)
 import           Data.Set                                     (Set, fromList)
 import qualified Data.Set                                     as S (filter)
 import           Data.Text.Encoding                           (encodeUtf8)
@@ -27,7 +29,8 @@ import           Distribution.Types.Dependency                (Dependency,
 import           Distribution.Types.Executable                (Executable,
                                                                buildInfo,
                                                                exeModules)
-import           Distribution.Types.GenericPackageDescription (condBenchmarks,
+import           Distribution.Types.GenericPackageDescription (GenericPackageDescription,
+                                                               condBenchmarks,
                                                                condExecutables,
                                                                condLibrary,
                                                                condSubLibraries,
@@ -54,62 +57,60 @@ import           ExHack.Types                                 (ComponentRoot (..
 -- TODO: some benchs and test suites are not exposing any modules but instead
 --       are directly exposing a single .hs file. It's a bit too tricky to implement
 --       for V1, but we probably should find a way to list those files later on.
-parseCabalFile :: TarballDesc -> ParseResult Package
-parseCabalFile (TarballDesc (tp, cf)) = 
-    Package <$> packN <*> filteredPackDep <*> pure cf <*> pure tp <*> expMainLibMods <*> pure Nothing <*> allMods
+parseCabalFile :: TarballDesc -> Maybe Package
+parseCabalFile (TarballDesc (tp, cf)) = force $ extractPack <$> gpackageDesc
   where
-    !gpackageDesc = parseGenericPackageDescription $ encodeUtf8 cf
-    !packN = package .  packageDescription <$> gpackageDesc
---  We want deps for both the app and the potential libs.
---  The following code is messy as hell but necessary. Deps are quite heavily burried
---  in Cabal's packages data structures...
---
---  I made types explicits to document a bit this black magic.
-    allMods :: ParseResult [PackageComponent]
-    !allMods = (testToPackageComponent <$$> tMods) <++> 
-        (libToPackageComponentInternal <$$> lMods) <++>
-        (benchToPackageComponent <$$> bMods) <++>
-        (exeToPackageComponent <$$> execMods) <++>
-        (maybeToList <$> allMainLibMods)
-    expMainLibMods :: ParseResult (Maybe PackageComponent)
-    !expMainLibMods = (libToPackageComponent . condTreeData) <$$> (condLibrary <$> gpackageDesc)
-    allMainLibMods :: ParseResult (Maybe PackageComponent)
-    !allMainLibMods = (libToPackageComponentInternal . condTreeData) <$$> (condLibrary <$> gpackageDesc) 
-    tMods :: ParseResult [TestSuite]
-    !tMods = (condTreeData . snd) <$$> condTestSuites <$> gpackageDesc
-    bMods :: ParseResult [Benchmark]
-    !bMods = (condTreeData . snd) <$$> condBenchmarks <$> gpackageDesc
-    lMods :: ParseResult [Library]
-    !lMods = (condTreeData . snd) <$$> condSubLibraries <$> gpackageDesc
-    execMods :: ParseResult [Executable]
-    !execMods = (condTreeData . snd) <$$> condExecutables <$> gpackageDesc
-    packDeps :: ParseResult (Set PackageName)
-    !packDeps = fromList <$> (fmap . fmap) depPkgName allDeps
---  The package should not be a dependancy to itself.
-    !filteredPackDep = do
-      pd <- packDeps 
-      pn <- pkgName <$> packN
-      return $ S.filter (/= pn) pd
-    allDeps :: ParseResult [Dependency]
-    !allDeps = mainLibDep `prApp` subLibDep `prApp` execDep `prApp` testDep `prApp` benchDep
-    mainLibDep :: ParseResult [Dependency]
-    !mainLibDep = treeToDep (maybeToList . condLibrary) <$> gpackageDesc
-    !subLibDep = treeToDep $ getTree condSubLibraries
-    !execDep = treeToDep $ getTree condExecutables
-    !testDep = treeToDep $ getTree condTestSuites
-    !benchDep = treeToDep $ getTree condBenchmarks
-    -- Helper functions
-    -- ================
-    getTree st = (fmap . fmap) snd (st <$> gpackageDesc)
-    treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
-    prApp :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
-    prApp a b = (++) <$> a <*> b
-    (<$$>) :: (Functor f1, Functor f2) => (a -> b) -> f1 (f2 a) -> f1 (f2 b) 
-    (<$$>) = fmap . fmap
-    -- Lifted list constructor
-    (<++>) :: ParseResult [a] -> ParseResult [a] -> ParseResult [a]
-    (<++>) a b= (<>) <$> a <*> b
-    infixr 5 <++>
+    gpackageDesc :: Maybe GenericPackageDescription
+    !gpackageDesc = parseResultToMaybe . parseGenericPackageDescription $ encodeUtf8 cf
+    parseResultToMaybe :: ParseResult GenericPackageDescription -> Maybe GenericPackageDescription
+    parseResultToMaybe !pr = 
+        let !r = runParseResult pr in 
+        case r of
+            (_, Left _)   -> Nothing
+            (_, Right x)  -> Just x
+    extractPack :: GenericPackageDescription -> Package
+    extractPack !gp = Package packN filteredPackDep cf tp expMainLibMods Nothing allMods
+        where
+            !packN = package .  packageDescription $ gp
+            --  The package should not be a dependancy to itself.
+            !filteredPackDep = S.filter (/= pkgName packN) packDeps
+            packDeps :: Set PackageName
+            !packDeps = fromList (depPkgName <$> allDeps)
+            allDeps :: [Dependency]
+            !allDeps = mainLibDep <> subLibDep <> execDep <> testDep <> benchDep
+            mainLibDep :: [Dependency]
+            !mainLibDep = treeToDep (maybeToList . condLibrary) gp 
+            !subLibDep = fromMaybe [] $ treeToDep $ getTree condSubLibraries
+            !execDep = fromMaybe [] $ treeToDep $ getTree condExecutables
+            !testDep = fromMaybe [] $ treeToDep $ getTree condTestSuites
+            !benchDep = fromMaybe [] $ treeToDep $ getTree condBenchmarks
+        --  We want deps for both the app and the potential libs.
+        --  The following code is messy as hell but necessary. Deps are quite heavily burried
+        --  in Cabal's packages data structures...
+        --
+        --  I made types explicits to document a bit this black magic.
+            allMods :: [PackageComponent]
+            !allMods = (testToPackageComponent <$> tMods) <> 
+                (libToPackageComponentInternal <$> lMods) <>
+                (benchToPackageComponent <$> bMods) <>
+                (exeToPackageComponent <$> execMods) <>
+                maybeToList allMainLibMods
+            expMainLibMods :: Maybe PackageComponent
+            !expMainLibMods = libToPackageComponent . condTreeData <$> condLibrary gp
+            allMainLibMods :: Maybe PackageComponent
+            !allMainLibMods = libToPackageComponentInternal . condTreeData <$> condLibrary gp 
+            tMods :: [TestSuite]
+            !tMods = condTreeData . snd <$> condTestSuites gp
+            bMods :: [Benchmark]
+            !bMods = condTreeData . snd <$> condBenchmarks gp
+            lMods :: [Library]
+            !lMods = condTreeData . snd <$> condSubLibraries gp
+            execMods :: [Executable]
+            !execMods = condTreeData . snd <$> condExecutables gp
+            -- Helper functions
+            -- ================
+            getTree st = (fmap . fmap) snd (st <$> gpackageDesc)
+            treeToDep t = concat <$> (fmap . fmap) condTreeConstraints t
 
 -- | Do not return internal modules.
 libToPackageComponent :: Library -> PackageComponent

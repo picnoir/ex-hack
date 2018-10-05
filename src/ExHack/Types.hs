@@ -10,6 +10,7 @@ Portability : POSIX
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
@@ -17,8 +18,8 @@ Portability : POSIX
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 
 module ExHack.Types (
     AlterDatabase,
@@ -75,6 +76,7 @@ module ExHack.Types (
 
 import           Prelude                        hiding (length, replicate)
 
+import           Control.DeepSeq                (NFData(..))
 import           Control.Lens.TH                (makeLenses)
 import           Control.Monad.Catch            (Exception, MonadCatch,
                                                  MonadMask, MonadThrow)
@@ -89,7 +91,7 @@ import           Data.String                    (IsString)
 import           Data.Text                      (Text, intercalate, length,
                                                  pack, replicate)
 import qualified Data.Text.IO                   as TIO (hPutStrLn, putStrLn)
-import           Database.Selda                 (RowID, SeldaM)
+import           Database.Selda                 (SeldaM)
 import           Distribution.ModuleName        (ModuleName (..), components,
                                                  fromComponents)
 import           Distribution.Types.PackageId   (PackageIdentifier (..),
@@ -98,6 +100,7 @@ import           Distribution.Types.PackageName (PackageName, mkPackageName,
                                                  unPackageName)
 import           Distribution.Version           (mkVersion)
 import           GHC                            (GenLocated (..), SrcSpan)
+import           GHC.Generics                   (Generic)
 import           System.Console.ANSI            (Color (Blue, Red),
                                                  ColorIntensity (Vivid),
                                                  ConsoleLayer (Foreground),
@@ -111,7 +114,8 @@ import           ExHack.Utils                   (Has (..))
 --
 --   Module names should be resolved using this filepath as root.
 newtype ComponentRoot = ComponentRoot FilePath
-    deriving (IsString, Eq, Show)
+    deriving (IsString, Eq, Show, Generic)
+instance NFData ComponentRoot 
 
 -- | Cabal package component.
 --
@@ -123,7 +127,8 @@ newtype ComponentRoot = ComponentRoot FilePath
 data PackageComponent = PackageComponent {
     mods  :: [ModuleName],
     roots :: [ComponentRoot]
-} deriving (Eq, Show)
+} deriving (Eq, Show, Generic)
+instance NFData PackageComponent
 
 -- | Package main datatype.
 data Package = Package {
@@ -140,7 +145,7 @@ data Package = Package {
   -- Invariant: this filepath should __/always/__ point to a valid tarball of this package.
   exposedModules :: Maybe PackageComponent,
   -- ^ Exposed module list if this package exposes a library.
-  dbId :: Maybe RowID,
+  dbId :: Maybe Int,
   -- ^ Index of this package in ex-hack's database.
   --
   -- Nothing if the package has not been inserted yet in the database.
@@ -148,7 +153,8 @@ data Package = Package {
   -- ^ Components of the package, including the one not exporting any symbols.
   --
   --   These modules are used as corpus during the symbol occurence search.
-} deriving (Eq, Show)
+} deriving (Eq, Show, Generic)
+instance NFData Package
 
 -- | Local directory containing the downloaded tarballs.
 newtype TarballsDir = TarballsDir FilePath deriving (Eq, Show)
@@ -265,7 +271,8 @@ newtype TarballDesc = TarballDesc (FilePath, Text)
 -- | Kind of cabal's ModuleName duplicate internally using Text. We want to be able
 --   to hash the module name, cabal one's cannot, hence this datatype.
 newtype ModuleNameT = ModuleNameT Text
-    deriving (Show, Eq, IsString, Hashable)
+    deriving (Show, Eq, IsString, Hashable, Generic)
+instance NFData ModuleNameT
 
 newtype PackageNameT = PackageNameT Text
     deriving (Show, Eq, IsString, Hashable)
@@ -276,7 +283,8 @@ newtype IndexedModuleNameT = IndexedModuleNameT (ModuleNameT, Int)
 
 -- | Source code symbol.
 newtype SymName = SymName Text
-    deriving (Show, Eq, IsString, Hashable)
+    deriving (Show, Eq, IsString, Hashable, Generic)
+instance NFData SymName
 
 -- | Symbol having been indexed in the database.
 --   Contains both a symbol name as well as its database identifier.
@@ -349,7 +357,8 @@ runStep (Step r) = runReaderT r
 
 -- | Directory where a Haskell package has been extracted to.
 newtype PackageFilePath = PackageFilePath FilePath
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
+instance NFData PackageFilePath
 
 -- | Type containing a package exported symbols.
 --
@@ -361,7 +370,8 @@ newtype PackageFilePath = PackageFilePath FilePath
 --     * A name.
 --     * A list containing the exported symbols.
 newtype PackageExports = PackageExports (Package, PackageFilePath, [(ModuleName, [SymName])])
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+instance NFData PackageExports 
 
 -- | Symbols imported in a module file.
 --

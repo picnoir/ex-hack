@@ -27,6 +27,7 @@ module ExHack.ProcessingSteps (
     saveGraphDep
 ) where
 
+import           Control.DeepSeq                (force)
 import           Control.Lens                   (view)
 import           Control.Monad                  (foldM_)
 import           Control.Monad.Catch            (MonadCatch, MonadThrow,
@@ -61,7 +62,7 @@ import           System.IO                      (IOMode (WriteMode),
 import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
 import           ExHack.Cabal.Cabal             (buildPackage)
-import           ExHack.Cabal.CabalParser       (parseCabalFile, runParseResult)
+import           ExHack.Cabal.CabalParser       (parseCabalFile)
 import           ExHack.Data.Db                 (getHomePagePackages,
                                                  getModulePageSyms,
                                                  getPackagePageMods,
@@ -214,9 +215,10 @@ genGraphDep pd = do
             let tp = tarballsDir </> T.unpack (packagedlDescName p) <.> "tar.gz"
             !cf <- liftIO $ T.readFile $ cabalFilesDir </> T.unpack (packagedlDescName p) <.> "cabal"
             let !pack = parseCabalFile $ TarballDesc (tp,cf)
-            case runParseResult pack of
-                (_, Left _)   -> pure (step + 1, xs)
-                (_, Right x) -> pure (step + 1, x:xs)
+            case pack of
+            -- TODO: log err
+                Nothing -> pure (step + 1, xs)
+                Just !x  -> pure (step + 1, x:xs)
       where
         logErrors e = do
             logError $ "[Step 4] ERROR cannot read " <> packagedlDescName p
@@ -303,7 +305,7 @@ retrievePkgsExports pkgs = do
         cr <- buildPackage pfp
         maybe (pure ()) (\(errCode, errStr) -> throwM $ CabalBuildError errCode errStr) cr 
         !x <- getPackageExports pfp p
-        pure (nb + 1,  x : xs)
+        pure (nb + 1,  force x : xs)
       where
         logErrors e = do
             logError $ "[Step 6] ERROR cannot get exports for " <> getName p <> ": " 

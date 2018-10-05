@@ -166,7 +166,7 @@ getPackageId :: forall m. (MonadSelda m, MonadMask m)
 getPackageId p = maybe
     (queryPkg p >>= maybe (throwM PackageNotInDatabase) pure)
     pure
-    (ET.dbId p)
+    (fromSql . SqlInt <$> ET.dbId p)
 
 -- | Save the exposed modules as well as their exposed symbols.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 

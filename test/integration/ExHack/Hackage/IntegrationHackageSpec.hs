@@ -12,7 +12,7 @@ import           Test.Hspec               (Spec, before, describe, it, shouldBe,
                                            shouldSatisfy)
 
 import           ExHack.Cabal.Cabal       (buildPackage)
-import           ExHack.Cabal.CabalParser (getSuccParse, parseCabalFile)
+import           ExHack.Cabal.CabalParser (parseCabalFile)
 import           ExHack.Hackage.Hackage   (PackageExports (..),
                                            getPackageExports, getTarballDesc,
                                            unpackHackageTarball)
@@ -43,14 +43,14 @@ spec = do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/timeit.tar.gz")
           _ <- buildPackage tbp
           tbdm <- fromJust <$> getTarballDesc tbp
-          let p = head $ getSuccParse [parseCabalFile tbdm]
+          let p = fromJust $ parseCabalFile tbdm
           (PackageExports (_, _, exports)) <- getPackageExports tbp p
           exports `shouldBe` [("System.TimeIt", ["timeIt", "timeItT"])]
         it "should retrieve text exports" $ do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/text.tar.gz")
           _ <- buildPackage tbp
           tbdm <- fromJust <$> getTarballDesc tbp
-          let p = head $ getSuccParse [parseCabalFile tbdm]
+          let p = fromJust $ parseCabalFile tbdm
           (PackageExports (_,_,exports)) <- getPackageExports tbp p
           exports `shouldBe` textExports
     before cleanWorkdir $ describe "processing steps" $
