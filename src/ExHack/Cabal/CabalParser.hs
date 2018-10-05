@@ -49,7 +49,7 @@ import           ExHack.Types                                 (ComponentRoot (..
                                                                Package (..),
                                                                PackageComponent (..),
                                                                PackageName,
-                                                               TarballDesc (..),
+                                                               PackageDesc(..),
                                                                pkgName)
 
 -- | Parse a cabalFile into a `Package`
@@ -57,8 +57,8 @@ import           ExHack.Types                                 (ComponentRoot (..
 -- TODO: some benchs and test suites are not exposing any modules but instead
 --       are directly exposing a single .hs file. It's a bit too tricky to implement
 --       for V1, but we probably should find a way to list those files later on.
-parseCabalFile :: TarballDesc -> Maybe Package
-parseCabalFile (TarballDesc (tp, cf)) = force $ extractPack <$> gpackageDesc
+parseCabalFile :: PackageDesc -> Maybe Package
+parseCabalFile (PackageDesc (pfp, cf)) = force $ extractPack <$> gpackageDesc
   where
     gpackageDesc :: Maybe GenericPackageDescription
     !gpackageDesc = parseResultToMaybe . parseGenericPackageDescription $ encodeUtf8 cf
@@ -69,7 +69,7 @@ parseCabalFile (TarballDesc (tp, cf)) = force $ extractPack <$> gpackageDesc
             (_, Left _)   -> Nothing
             (_, Right x)  -> Just x
     extractPack :: GenericPackageDescription -> Package
-    extractPack !gp = Package packN filteredPackDep cf tp expMainLibMods Nothing allMods
+    extractPack !gp = Package packN filteredPackDep cf pfp expMainLibMods Nothing allMods
         where
             !packN = package .  packageDescription $ gp
             --  The package should not be a dependancy to itself.

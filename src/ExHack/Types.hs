@@ -51,7 +51,7 @@ module ExHack.Types (
     StackageFile(..),
     Step,
     SymName(..),
-    TarballDesc(..),
+    PackageDesc(..),
     TarballsDir(..),
     UnifiedSym(..),
     WorkDir(..),
@@ -130,6 +130,11 @@ data PackageComponent = PackageComponent {
 } deriving (Eq, Show, Generic)
 instance NFData PackageComponent
 
+-- | Directory where a Haskell package has been extracted to.
+newtype PackageFilePath = PackageFilePath FilePath
+    deriving (Show, Eq, Generic)
+instance NFData PackageFilePath
+
 -- | Package main datatype.
 data Package = Package {
   name :: PackageIdentifier,
@@ -139,7 +144,7 @@ data Package = Package {
   -- ^ Dependancies needed to build this package.
   cabalFile :: Text,
   -- ^ Cabal file providing a detailed description of this package.
-  tarballPath :: FilePath,
+  packageFilePath :: PackageFilePath,
   -- ^ Local path to the tarball containing the source code of this package.
   -- 
   -- Invariant: this filepath should __/always/__ point to a valid tarball of this package.
@@ -259,14 +264,15 @@ instance Has (Config a) HtmlDir where
 --   (packageName, cabalUrl, tarballUrl)
 newtype PackageDlDesc = PackageDlDesc (Text,Text,Text)
 
--- | Informations extracted from a package entry not yet extracted from its tarball.
+-- | Informations extracted from a package entry for which we did not parsed
+--   yet its cabal description.
 --
 -- Two elements:
 --
---   * Filepath to the tarball.
---   * The cabal file of this package.
+--   * Filepath to the extracted package.
+--   * The cabal description of this package.
 --
-newtype TarballDesc = TarballDesc (FilePath, Text)
+newtype PackageDesc = PackageDesc (PackageFilePath, Text)
 
 -- | Kind of cabal's ModuleName duplicate internally using Text. We want to be able
 --   to hash the module name, cabal one's cannot, hence this datatype.
@@ -304,6 +310,7 @@ newtype UnifiedSym = UnifiedSym (IndexedSym, LocatedSym)
 -- | Source code of a module in which we found some occurences
 --   of an `IndexedSym`.
 data SourceCodeFile = SourceCodeFile !Text !ModuleNameT !PackageNameT
+    deriving (Eq, Show, Generic)
 
 
 class (Monad m) => MonadLog m where
@@ -355,10 +362,6 @@ newtype Step c s a = Step (ReaderT (Config s) IO a)
 runStep :: Step c s a -> Config s -> IO a
 runStep (Step r) = runReaderT r
 
--- | Directory where a Haskell package has been extracted to.
-newtype PackageFilePath = PackageFilePath FilePath
-    deriving (Show, Eq, Generic)
-instance NFData PackageFilePath
 
 -- | Type containing a package exported symbols.
 --

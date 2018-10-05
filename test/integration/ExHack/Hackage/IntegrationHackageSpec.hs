@@ -1,11 +1,16 @@
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+
 module ExHack.Hackage.IntegrationHackageSpec (spec) where
 
 import           Data.FileEmbed           (embedFile)
 import           Data.Maybe               (fromJust, isNothing)
-import           System.Directory         (createDirectory, makeAbsolute,
+import Data.List (isSuffixOf)
+import       qualified    Data.Text.IO as T (readFile)
+import           System.Directory         (createDirectory, listDirectory,
+                                           makeAbsolute,
                                            removeDirectoryRecursive)
 import           System.FilePath          (equalFilePath, (</>))
 import           Test.Hspec               (Spec, before, describe, it, shouldBe,
@@ -14,14 +19,15 @@ import           Test.Hspec               (Spec, before, describe, it, shouldBe,
 import           ExHack.Cabal.Cabal       (buildPackage)
 import           ExHack.Cabal.CabalParser (parseCabalFile)
 import           ExHack.Hackage.Hackage   (PackageExports (..),
-                                           getPackageExports, getTarballDesc,
+                                           getPackageExports,
                                            unpackHackageTarball)
 import           ExHack.ProcessingSteps   (genGraphDep, generateDb,
-                                           indexSymbols, retrievePkgsExports,
-                                           saveGraphDep, generateHtmlPages)
+                                           generateHtmlPages, indexSymbols,
+                                           retrievePkgsExports, saveGraphDep)
 import           ExHack.Types             (CabalFilesDir (..), Config (..),
                                            DatabaseStatus (..), HtmlDir (..),
-                                           ModuleName, PackageDlDesc (..),
+                                           ModuleName, PackageDesc (..),
+                                           PackageDlDesc (..),
                                            PackageFilePath (..),
                                            StackageFile (..), SymName,
                                            TarballsDir (..), WorkDir (..),
@@ -42,15 +48,15 @@ spec = do
         it "should retrieve timeIt exports" $ do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/timeit.tar.gz")
           _ <- buildPackage tbp
-          tbdm <- fromJust <$> getTarballDesc tbp
-          let p = fromJust $ parseCabalFile tbdm
+          pd <- getPackageDesc tbp
+          let p = fromJust $ parseCabalFile $ fromJust pd 
           (PackageExports (_, _, exports)) <- getPackageExports tbp p
           exports `shouldBe` [("System.TimeIt", ["timeIt", "timeItT"])]
         it "should retrieve text exports" $ do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/text.tar.gz")
           _ <- buildPackage tbp
-          tbdm <- fromJust <$> getTarballDesc tbp
-          let p = fromJust $ parseCabalFile tbdm
+          pd <- getPackageDesc tbp
+          let p = fromJust $ parseCabalFile $ fromJust pd
           (PackageExports (_,_,exports)) <- getPackageExports tbp p
           exports `shouldBe` textExports
     before cleanWorkdir $ describe "processing steps" $
@@ -71,6 +77,23 @@ spec = do
             let cidx = ce {_dbHandle=dbIdx} :: Config 'IndexedSyms
             runStep generateHtmlPages cidx
             pure ()
+
+getPackageDesc ::  
+  PackageFilePath -- ^ 'FilePath' that may contain a tarball. 
+  -> IO (Maybe PackageDesc)
+getPackageDesc pfp@(PackageFilePath fp) = do
+  f <- Just <$> listDirectory fp
+  let mcfp = f >>= getCabalFp >>= \case
+        [] -> Nothing
+        a  -> Just $ head a
+  case mcfp of
+    Nothing -> pure Nothing
+    Just cfp -> do
+      fcontent <- T.readFile (fp </> cfp)
+      pure . Just $ PackageDesc (pfp, fcontent)
+  where
+    -- Filters .cabal files out of a list of files.
+    getCabalFp = Just <$> filter (isSuffixOf ".cabal")
 
 cleanWorkdir :: IO ()
 cleanWorkdir = do

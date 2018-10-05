@@ -101,7 +101,7 @@ import           ExHack.Types                   (AlterDatabase,
                                                  LocatedSym (..), ModuleName,
                                                  ModuleNameT (..),
                                                  MonadLog (..), MonadStep,
-                                                 Package (allComponents, tarballPath),
+                                                 Package (allComponents, packageFilePath),
                                                  PackageComponent (..),
                                                  PackageDlDesc,
                                                  PackageDlDesc (..),
@@ -109,7 +109,7 @@ import           ExHack.Types                   (AlterDatabase,
                                                  PackageFilePath (..),
                                                  SourceCodeFile (..),
                                                  StackageFile (..), SymName,
-                                                 TarballDesc (..),
+                                                 PackageDesc (..),
                                                  TarballsDir (..),
                                                  UnifiedSym (..), WorkDir (..),
                                                  getDatabaseHandle, getModNameT,
@@ -198,6 +198,7 @@ dlAssets packages = do
 genGraphDep :: forall c m.
     (Has c TarballsDir,
      Has c CabalFilesDir,
+     Has c WorkDir,
      Has c (DatabaseHandle 'Initialized),
      MonadStep c m)
     => [PackageDlDesc] -> m [Package]
@@ -205,16 +206,20 @@ genGraphDep pd = do
     logInfoTitle "[Step 4] Generating dependencies graph."
     tbd <- asks (view hasLens)
     cd <- asks (view hasLens)
+    wd <- asks (view hasLens) 
     logInfo "[+] Parsing cabal files."
-    (_, !pkgs) <- foldM' (readPkgsFiles cd tbd (length pd)) (1,[]) pd
+    (_, !pkgs) <- foldM' (readPkgsFiles cd wd tbd (length pd)) (1,[]) pd
     pure pkgs
   where
-    readPkgsFiles (CabalFilesDir cabalFilesDir) (TarballsDir tarballsDir) !totalSteps (!step, xs) p = 
+    readPkgsFiles (CabalFilesDir cabalFilesDir) (WorkDir wd) (TarballsDir tarballsDir) !totalSteps (!step, xs) p = 
         handleAll logErrors $ do
+            logInfoProgress 4 totalSteps step $ "Unzip " <> packagedlDescName p <> " package."
+            let tbp = tarballsDir </> T.unpack (packagedlDescName p) <.> "tar.gz"
+            tb <- liftIO $ BS.readFile tbp
+            pfp <- unpackHackageTarball wd tb
             logInfoProgress 4 totalSteps step $ "Reading " <> packagedlDescName p <> " cabal file."
-            let tp = tarballsDir </> T.unpack (packagedlDescName p) <.> "tar.gz"
             !cf <- liftIO $ T.readFile $ cabalFilesDir </> T.unpack (packagedlDescName p) <.> "cabal"
-            let !pack = parseCabalFile $ TarballDesc (tp,cf)
+            let !pack = parseCabalFile $ PackageDesc (pfp,cf)
             case pack of
             -- TODO: log err
                 Nothing -> pure (step + 1, xs)
@@ -271,16 +276,14 @@ saveGraphDep pkgs = do
 --   everything in the ex-hack database.
 --   TODO: merge those two steps.
 retrievePkgsExports :: forall c m.
-    (Has c WorkDir,
-     Has c (DatabaseHandle 'DepsGraph),
+    (Has c (DatabaseHandle 'DepsGraph),
      MonadStep c m)
    => [Package] -> m (DatabaseHandle 'PkgExports, [PackageExports])
 retrievePkgsExports pkgs = do
     logInfoTitle "[Step 6] Retrieving modules exports."
     dbHandle <- asks (view hasLens) :: m (DatabaseHandle 'DepsGraph)
     let (dbFp, dbHandle') = getDatabaseHandle dbHandle
-    wd <- asks (view hasLens) 
-    (_, pkgsExports) <- foldM' (getPkgExports (length pkgs) wd) (1, []) pkgs
+    (_, pkgsExports) <- foldM' (getPkgExports (length pkgs)) (1, []) pkgs
     logInfo "[Step 6] Saving modules exports to database."
     _ <- liftIO $ withSQLite dbFp $
             foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
@@ -297,11 +300,10 @@ retrievePkgsExports pkgs = do
             logError $ "[Step 6] ERROR cannot save exports of " <> getName p 
                         <> " in database: " <> T.pack (displayException e)
             pure $ step + 1
-    getPkgExports :: Int -> WorkDir -> (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
-    getPkgExports totalSteps (WorkDir wd) (!nb, xs) p = handleAll logErrors $ do
+    getPkgExports :: Int -> (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
+    getPkgExports totalSteps (!nb, xs) p = handleAll logErrors $ do
         logInfoProgress 6 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
-        tb <- liftIO . BS.readFile $ tarballPath p
-        pfp <- unpackHackageTarball wd tb
+        let pfp = packageFilePath p
         cr <- buildPackage pfp
         maybe (pure ()) (\(errCode, errStr) -> throwM $ CabalBuildError errCode errStr) cr 
         !x <- getPackageExports pfp p

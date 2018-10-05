@@ -116,6 +116,7 @@ test-suite integration-tests
     , file-embed
     , filepath
     , hspec
+    , text
   other-modules:
       ExHack.Hackage.IntegrationHackageSpec
   default-language: Haskell2010

@@ -54,15 +54,13 @@ import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          getName)
 import qualified ExHack.Types           as ET (Package (..))
 
-packageId   :: Selector (RowID :*: Text :*: Text :*: Text) RowID
-packageName :: Selector (RowID :*: Text :*: Text :*: Text) Text
-packages    ::  Table (RowID :*: Text :*: Text :*: Text)
-(packages, packageId :*: packageName :*: _ :*: _) 
+packageId   :: Selector (RowID :*: Text) RowID
+packageName :: Selector (RowID :*: Text) Text
+packages    ::  Table (RowID :*: Text)
+(packages, packageId :*: packageName) 
   = tableWithSelectors "packages" $
               autoPrimary "packageId"
               :*: required "name"
-              :*: required "tarball_path"
-              :*: required "cabal_file"
 
 dependancies :: Table (RowID :*: RowID :*: RowID)
 depPack :: Selector (RowID :*: RowID :*: RowID) RowID
@@ -148,8 +146,7 @@ savePackageDeps p = do
 
 -- | Save a package list in the DB.
 savePackages :: (MonadSelda m) => [ET.Package] -> m ()
-savePackages xs = insert_ packages $
-    (\p -> def :*: getName p :*: ET.cabalFile p :*: (pack . ET.tarballPath) p) <$> xs 
+savePackages xs = insert_ packages $ (\p -> def :*: getName p) <$> xs 
 
 data SaveModuleException = PackageNotInDatabase | ModuleNotInDatabase Text 
     deriving (Show)

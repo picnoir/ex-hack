@@ -7,6 +7,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric     #-}
 
 module ExHack.Renderer.Types (
     Col,
@@ -26,6 +27,7 @@ module ExHack.Renderer.Types (
 import           Control.Monad.Catch (Exception)
 import           Data.Text           (Text, pack, replace, unpack)
 import           Database.Selda      (RowID)
+import           GHC.Generics        (Generic)
 import           Network.URI         (escapeURIString, isReserved)
 import           Text.Hamlet         (Render)
 
@@ -33,9 +35,11 @@ import           ExHack.Types        (ModuleNameT, PackageNameT,
                                       SourceCodeFile (..))
 
 newtype PackageName            = PackageName (RowID, Text)
+    deriving (Eq, Show, Generic)
 newtype ModuleName             = ModuleName (RowID, Text)
-data HighlightedSourceCodeFile = HighlightedSourceCodeFile 
-                                    Text ModuleNameT PackageNameT deriving (Eq, Show)
+    deriving (Eq, Show, Generic)
+data HighlightedSourceCodeFile = HighlightedSourceCodeFile !Text !ModuleNameT !PackageNameT
+    deriving (Eq, Show, Generic)
 type SymbolName                = Text
 type Col                       = Int
 type Line                      = Int
@@ -47,16 +51,20 @@ data Route =
     | ModulePage PackageName ModuleName
 
 -- | Datatype used to populate the home page template.
-data HomePagePackage = HomePagePackage PackageName Int
+data HomePagePackage = HomePagePackage !PackageName !Int
+    deriving (Eq, Show, Generic)
 
 -- | Datatype used to populate the module HTML template whith non highlighted code.
-data SymbolOccurs = SymbolOccurs SymbolName [(Col, Line, SourceCodeFile)]
+data SymbolOccurs = SymbolOccurs !SymbolName [(Col, Line, SourceCodeFile)]
+    deriving (Eq, Show, Generic)
 
 -- | Datatype used to populate the module HTML template whith highlighted code.
 data HighlightedSymbolOccurs = HighlightedSymbolOccurs SymbolName [(Col, Line, HighlightedSourceCodeFile)]
+    deriving (Eq, Show, Generic)
 
 -- | Exception raised during the code highlight process.
-newtype HighLightError = HighLightError String deriving (Eq, Show)
+newtype HighLightError = HighLightError String
+    deriving (Eq, Show, Generic)
 
 instance Exception HighLightError
 
