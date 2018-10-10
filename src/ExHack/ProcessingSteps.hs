@@ -103,13 +103,12 @@ import           ExHack.Types                   (AlterDatabase,
                                                  MonadLog (..), MonadStep,
                                                  Package (allComponents, packageFilePath),
                                                  PackageComponent (..),
+                                                 PackageDesc (..),
                                                  PackageDlDesc,
                                                  PackageDlDesc (..),
-                                                 PackageExports (..),
                                                  PackageFilePath (..),
                                                  SourceCodeFile (..),
                                                  StackageFile (..), SymName,
-                                                 PackageDesc (..),
                                                  TarballsDir (..),
                                                  UnifiedSym (..), WorkDir (..),
                                                  getDatabaseHandle, getModNameT,
@@ -274,7 +273,6 @@ saveGraphDep pkgs = do
 --   Builds the packages using cabal, load the modules in a 
 --   GHC-API program which extracts the exports and finally save
 --   everything in the ex-hack database.
---   TODO: merge those two steps.
 retrievePkgsExports :: forall c m.
     (Has c (DatabaseHandle 'DepsGraph),
      MonadStep c m)
@@ -283,36 +281,24 @@ retrievePkgsExports pkgs = do
     logInfoTitle "[Step 6] Retrieving modules exports."
     dbHandle <- asks (view hasLens) :: m (DatabaseHandle 'DepsGraph)
     let (dbFp, dbHandle') = getDatabaseHandle dbHandle
-    (_, pkgsExports) <- foldM' (getPkgExports (length pkgs)) (1, []) pkgs
-    logInfo "[Step 6] Saving modules exports to database."
-    _ <- liftIO $ withSQLite dbFp $
-            foldM_ (savePackageModsLogProgress (length pkgsExports)) 1 pkgsExports 
-    pure (dbHandle')
+    foldM_ (getPkgExports dbFp (length pkgs)) 1 pkgs
+    pure dbHandle'
   where
-    savePackageModsLogProgress :: Int -> Int -> PackageExports -> SeldaM Int 
-    savePackageModsLogProgress !totalSteps !step pe@(PackageExports p _ _) = 
-        handleAll logErrors $ do
-            logInfoProgress 6 totalSteps step $ "Saving " <> getName p <> " exports to database."
-            savePackageMods pe
-            pure $ step + 1
-      where
-        logErrors e = do
-            logError $ "[Step 6] ERROR cannot save exports of " <> getName p 
-                        <> " in database: " <> T.pack (displayException e)
-            pure $ step + 1
-    getPkgExports :: Int -> (Int, [PackageExports]) -> Package -> m (Int,[PackageExports])
-    getPkgExports totalSteps (!nb, xs) p = handleAll logErrors $ do
+    getPkgExports :: FilePath -> Int -> Int -> Package -> m Int
+    getPkgExports dbFp totalSteps !nb p = handleAll logErrors $ do
         logInfoProgress 6 totalSteps nb $ "Retrieving "<> getName p <> " exports." 
         let pfp = packageFilePath p
         cr <- buildPackage pfp
         maybe (pure ()) (\(errCode, errStr) -> throwM $ CabalBuildError errCode errStr) cr 
-        !x <- getPackageExports pfp p
-        pure (nb + 1,  force x : xs)
+        x  <- getPackageExports pfp p
+        logInfoProgress 6 totalSteps nb $ "Saving "<> getName p <> " exports to DB." 
+        _ <- liftIO $ withSQLite dbFp $ savePackageMods p $ force x
+        pure $ nb + 1
       where
         logErrors e = do
             logError $ "[Step 6] ERROR cannot get exports for " <> getName p <> ": " 
                      <> T.pack (displayException e)
-            pure (nb + 1, xs)
+            pure $ nb + 1
             
 -- | `Step` 7: Indexes the code source symbols in the database.
 --
@@ -363,7 +349,7 @@ indexSymbols pkgs = do
         syms <- getModSymbols p pfp cr mn
         fileContent <- liftIO $ T.readFile $ toModFilePath pfp cr mn
         let !file = SourceCodeFile fileContent (getModNameT mn) (getPackageNameT p)
-            !unsyms = unifySymbols isymsMap syms
+            unsyms = unifySymbols isymsMap syms
         withSQLite dbFp $ saveModuleUnifiedSymbols unsyms file 
       where
         logErrors e = do

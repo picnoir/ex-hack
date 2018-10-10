@@ -35,7 +35,7 @@ buildPackage (PackageFilePath pfp) = liftIO $ withCurrentDirectory pfp cabalBuil
             else build
 
 installDeps :: MonadIO m => m (Maybe (Int, String))
-installDeps = runCabalCommand ["install","--dependencies-only"]
+installDeps = runCabalCommand ["install","--dependencies-only", "--force-reinstalls"]
 
 build :: MonadIO m => m (Maybe (Int, String))
 build = runCabalCommand ["build"]

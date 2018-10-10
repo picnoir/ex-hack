@@ -19,6 +19,7 @@ module ExHack.Ghc (
   ) where
 
 import           Avail                   (AvailInfo (..))
+import           Control.DeepSeq         (force)
 import           Control.Monad           (when)
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Maybe              (fromMaybe, isNothing)
@@ -106,15 +107,15 @@ getCabalDynFlagsLib fp = do
 
 -- | Retrieves a `DesugaredModule` exported symbols.
 getModExports :: DesugaredModule -> [SymName]
-getModExports = fmap getAvName . mg_exports . dm_core_module
+getModExports = force $ fmap getAvName . mg_exports . dm_core_module
 
 getAvName :: AvailInfo -> SymName
 getAvName (Avail n) = SymName $ pack $ getOccString n
 getAvName (AvailTC n _ _) = SymName $ pack $ getOccString n
 
 withGhcEnv :: (MonadIO m, MonadLog m) => PackageFilePath -> ComponentRoot -> ModuleName -> Ghc a -> m a
-withGhcEnv (PackageFilePath pfp) (ComponentRoot cr) mn a = 
-    liftIO $ withCurrentDirectory pfp $ do 
+withGhcEnv (PackageFilePath pfp) (ComponentRoot cr) mn a =
+    liftIO $ withCurrentDirectory pfp $ do
         dflagsCM <- getCabalDynFlagsLib pfp
         when (isNothing dflagsCM) . logError $ "Cannot retrieve cabal flags for " <> T.pack pfp <> "."
         let dflagsC = fromMaybe [] dflagsCM 

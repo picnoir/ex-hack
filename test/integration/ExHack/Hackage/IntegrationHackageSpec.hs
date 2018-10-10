@@ -6,9 +6,9 @@
 module ExHack.Hackage.IntegrationHackageSpec (spec) where
 
 import           Data.FileEmbed           (embedFile)
+import           Data.List                (isSuffixOf)
 import           Data.Maybe               (fromJust, isNothing)
-import Data.List (isSuffixOf)
-import       qualified    Data.Text.IO as T (readFile)
+import qualified Data.Text.IO             as T (readFile)
 import           System.Directory         (createDirectory, listDirectory,
                                            makeAbsolute,
                                            removeDirectoryRecursive)
@@ -50,14 +50,14 @@ spec = do
           _ <- buildPackage tbp
           pd <- getPackageDesc tbp
           let p = fromJust $ parseCabalFile $ fromJust pd 
-          (PackageExports _ _ exports) <- getPackageExports tbp p
+          exports <- getPackageExports tbp p
           exports `shouldBe` [("System.TimeIt", ["timeIt", "timeItT"])]
         it "should retrieve text exports" $ do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/text.tar.gz")
           _ <- buildPackage tbp
           pd <- getPackageDesc tbp
           let p = fromJust $ parseCabalFile $ fromJust pd
-          (PackageExports _ _ exports) <- getPackageExports tbp p
+          exports <- getPackageExports tbp p
           exports `shouldBe` textExports
     before cleanWorkdir $ describe "processing steps" $
         it "should perform a e2e run with a reduced set of packages" $ do

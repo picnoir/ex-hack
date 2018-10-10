@@ -1,29 +1,28 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module ExHack.Hackage.Hackage (
-    unpackHackageTarball,
-    loadExposedModules,
-    getPackageExports,
     findComponentRoot,
+    getPackageExports,
+    unpackHackageTarball,
     PackageExports(..)
 ) where
 
 import qualified Codec.Archive.Tar      as Tar (Entries (..), entryPath, read,
                                                 unpack)
 import           Codec.Compression.GZip (decompress)
+import           Control.DeepSeq        (force)
 import           Control.Monad.Catch    (MonadThrow)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString        as BS (ByteString)
 import qualified Data.ByteString.Lazy   as BL (fromStrict)
-import           System.Directory       (makeAbsolute,
-                                         withCurrentDirectory)
+import           System.Directory       (makeAbsolute, withCurrentDirectory)
 import           System.FilePath        (FilePath, (</>))
 
-import           ExHack.Ghc             (DesugaredModule, getDesugaredMod,
-                                         getModExports)
+import qualified ExHack.Ghc             as GHC (getDesugaredMod, getModExports)
 import           ExHack.ModulePaths     (findComponentRoot)
-import           ExHack.Types           (ComponentRoot (..), ModuleName,
-                                         MonadLog, Package (exposedModules),
+import           ExHack.Types           (ComponentRoot (..), ModuleExports,
+                                         ModuleName, MonadLog,
+                                         Package (exposedModules),
                                          PackageComponent (..),
                                          PackageExports (..),
                                          PackageFilePath (..))
@@ -42,24 +41,28 @@ unpackHackageTarball dir tb = do
     getRootPath (Tar.Next e _) = Tar.entryPath e
     getRootPath _ = error "Cannot find tar's root directory."
 
--- | Retrieve the exported symbols of a cabal package.
-getPackageExports :: (MonadIO m) => PackageFilePath -> Package -> m PackageExports
-getPackageExports pfp@(PackageFilePath pfps) p = do
-  em <- liftIO $ withCurrentDirectory pfps (loadExposedModules pfp p)
-  pure $ PackageExports p pfp (getExports <$> em)
+getModNames :: Package -> [ModuleName]
+getModNames p = maybe mempty mods exMods
     where
-      getExports (mn, dm) = (mn, getModExports dm) 
-
-loadExposedModules :: (MonadIO m, MonadThrow m, MonadLog m) 
-                    => PackageFilePath -> Package -> m [(ModuleName, DesugaredModule)] 
-loadExposedModules pfp p = loadModule pfp croots `mapM` maybe mempty mods exMods
-    where
+        exMods :: Maybe PackageComponent
         !exMods = exposedModules p 
-        croots :: [ComponentRoot]
-        !croots = maybe [ComponentRoot "./"] roots exMods
 
-loadModule :: forall m. (MonadIO m, MonadThrow m, MonadLog m) 
-            => PackageFilePath -> [ComponentRoot] -> ModuleName -> m (ModuleName, DesugaredModule)
-loadModule pfp croots mn = do
+-- | Retrieve the exported symbols of a module.
+getModExports :: forall m. (MonadIO m, MonadThrow m, MonadLog m) 
+            => PackageFilePath -> [ComponentRoot] -> ModuleName -> m ModuleExports
+getModExports pfp croots mn = do
     cr <- findComponentRoot pfp croots mn
-    getDesugaredMod pfp cr mn >>= \m -> pure (mn,m)
+    GHC.getDesugaredMod pfp cr mn >>= \m -> pure (mn, force $ GHC.getModExports m)
+
+-- | Retrieve the exported symbols of a package, module by module.
+getPackageExports :: forall m. (MonadIO m, MonadThrow m, MonadLog m)
+            => PackageFilePath -> Package -> m [ModuleExports]
+getPackageExports pfp@(PackageFilePath pfps) p = 
+    liftIO $ withCurrentDirectory pfps $ getModExports pfp croots `mapM` mns
+  where
+    pcs :: Maybe PackageComponent
+    pcs = exposedModules p 
+    croots :: [ComponentRoot]
+    !croots = maybe [ComponentRoot "./"] roots pcs
+    mns :: [ModuleName]
+    mns = getModNames p 

@@ -34,12 +34,14 @@ module ExHack.Types (
     IndexedModuleNameT(..),
     IndexedSym(..),
     LocatedSym(..),
+    ModuleExports,
     ModuleName(..),
     ModuleNameT(..),
     MonadLog(..),
     MonadStep,
     Package(..),
     PackageComponent(..),
+    PackageDesc(..),
     PackageDlDesc(..),
     PackageExports(..),
     PackageFilePath(..),
@@ -51,7 +53,6 @@ module ExHack.Types (
     StackageFile(..),
     Step,
     SymName(..),
-    PackageDesc(..),
     TarballsDir(..),
     UnifiedSym(..),
     WorkDir(..),
@@ -76,7 +77,7 @@ module ExHack.Types (
 
 import           Prelude                        hiding (length, replicate)
 
-import           Control.DeepSeq                (NFData(..))
+import           Control.DeepSeq                (NFData (..))
 import           Control.Lens.TH                (makeLenses)
 import           Control.Monad.Catch            (Exception, MonadCatch,
                                                  MonadMask, MonadThrow)
@@ -376,6 +377,7 @@ data PackageExports = PackageExports Package PackageFilePath [(ModuleName, [SymN
   deriving (Show, Eq, Generic)
 instance NFData PackageExports 
 
+type ModuleExports = (ModuleName, [SymName])
 -- | Symbols imported in a module file.
 --
 --   This datastructure is about optimizing the lookups, allowing us to

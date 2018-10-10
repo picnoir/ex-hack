@@ -47,12 +47,12 @@ import           ExHack.Renderer.Types  (HomePagePackage (..), ModuleName (..),
                                          SymbolOccurs (..))
 import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          IndexedSym (..), LocatedSym (..),
-                                         ModuleNameT (..), PackageExports (..),
-                                         PackageNameT (..), SourceCodeFile (..),
+                                         ModuleNameT (..), PackageNameT (..),
+                                         SourceCodeFile (..),
                                          SourceCodeFile (..), SymName (..),
                                          UnifiedSym (..), depsNames, getModName,
                                          getName)
-import qualified ExHack.Types           as ET (Package (..))
+import qualified ExHack.Types           as ET (ModuleExports, Package (..))
 
 packageId   :: Selector (RowID :*: Text) RowID
 packageName :: Selector (RowID :*: Text) Text
@@ -167,10 +167,11 @@ getPackageId p = maybe
 
 -- | Save the exposed modules as well as their exposed symbols.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
-                => PackageExports -> m ()
-savePackageMods (PackageExports p _ xs) = do
+                => ET.Package  -> [ET.ModuleExports] -> m RowID
+savePackageMods p xs = do
     pid <- getPackageId p
     saveMod pid `mapM_` xs
+    pure pid
   where
     saveMod pid (m, syms) = do
         mid <- insertWithPK exposedModules [def :*: getModName m :*: pid]
