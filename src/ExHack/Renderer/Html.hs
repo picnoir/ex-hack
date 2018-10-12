@@ -37,7 +37,7 @@ import           ExHack.Types           (ModuleNameT (..), PackageNameT (..))
 highLightCode :: forall m. (MonadIO m, MonadMask m) => T.Text -> m T.Text
 highLightCode t = do
     (ec,out,err) <- liftIO $ readProcessWithExitCode 
-        "/nix/store/w7p41gs88mkpk8k0bwbgg7bc3970fpbl-python3.6-Pygments-2.2.0/bin/pygmentize" ["-l", "haskell", "-f", "html"] $ T.unpack t
+        "/nix/store/fxvb6bczjxnai4aakbfdi452h0y0i246-python3ze" ["-l", "haskell", "-f", "html"] $ T.unpack t
     case ec of
         ExitSuccess -> pure $ T.pack out
         ExitFailure _ -> throwM $ HighLightError err

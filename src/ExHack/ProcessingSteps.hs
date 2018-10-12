@@ -27,7 +27,6 @@ module ExHack.ProcessingSteps (
     saveGraphDep
 ) where
 
-import           Control.DeepSeq                (force)
 import           Control.Lens                   (view)
 import           Control.Monad                  (foldM_)
 import           Control.Monad.Catch            (MonadCatch, MonadThrow,
@@ -48,7 +47,7 @@ import qualified Data.Text                      as T (pack, replace, unpack)
 import qualified Data.Text.IO                   as T (readFile)
 import qualified Data.Text.Lazy                 as TL (Text)
 import qualified Data.Text.Lazy.IO              as TL (hPutStr)
-import           Database.Selda                 (SeldaM)
+import           Database.Selda                 (RowID, SeldaM)
 import           Database.Selda.SQLite          (withSQLite)
 import           Network.HTTP.Client            (Manager, httpLbs,
                                                  managerSetProxy, newManager,
@@ -65,15 +64,16 @@ import           ExHack.Cabal.Cabal             (buildPackage)
 import           ExHack.Cabal.CabalParser       (parseCabalFile)
 import           ExHack.Data.Db                 (getHomePagePackages,
                                                  getModulePageSyms,
+                                                 getPackageId,
                                                  getPackagePageMods,
                                                  getPkgImportScopes, initDb,
+                                                 saveModuleExports,
                                                  saveModuleUnifiedSymbols,
-                                                 savePackageDeps,
-                                                 savePackageMods, savePackages)
+                                                 savePackageDeps, savePackages)
 import           ExHack.Ghc                     (getModImports, getModSymbols,
                                                  unLoc)
 import           ExHack.Hackage.Hackage         (findComponentRoot,
-                                                 getPackageExports,
+                                                 getModExports, getModNames,
                                                  unpackHackageTarball)
 import           ExHack.ModulePaths             (toModFilePath)
 import           ExHack.Renderer.Html           (addLineMarker, highLightCode,
@@ -101,7 +101,7 @@ import           ExHack.Types                   (AlterDatabase,
                                                  LocatedSym (..), ModuleName,
                                                  ModuleNameT (..),
                                                  MonadLog (..), MonadStep,
-                                                 Package (allComponents, packageFilePath),
+                                                 Package (allComponents, exposedModules, packageFilePath),
                                                  PackageComponent (..),
                                                  PackageDesc (..),
                                                  PackageDlDesc,
@@ -220,7 +220,6 @@ genGraphDep pd = do
             !cf <- liftIO $ T.readFile $ cabalFilesDir </> T.unpack (packagedlDescName p) <.> "cabal"
             let !pack = parseCabalFile $ PackageDesc (pfp,cf)
             case pack of
-            -- TODO: log err
                 Nothing -> pure (step + 1, xs)
                 Just !x  -> pure (step + 1, x:xs)
       where
@@ -290,11 +289,19 @@ retrievePkgsExports pkgs = do
         let pfp = packageFilePath p
         cr <- buildPackage pfp
         maybe (pure ()) (\(errCode, errStr) -> throwM $ CabalBuildError errCode errStr) cr 
-        x  <- getPackageExports pfp p
-        logInfoProgress 6 totalSteps nb $ "Saving "<> getName p <> " exports to DB." 
-        _ <- liftIO $ withSQLite dbFp $ savePackageMods p $ force x
+        let mns    = getModNames p
+            croots = maybe [ComponentRoot "./"] roots $ exposedModules p
+        pid <- liftIO $ withSQLite dbFp $ getPackageId p
+        processMod pid pfp croots `mapM_` mns
         pure $ nb + 1
       where
+        processMod :: RowID -> PackageFilePath -> [ComponentRoot] -> ModuleName -> m ()
+        processMod pid pfp crs mn = do
+            (_, me) <- getModExports pfp crs mn
+            -- Breaks a bit the design but necessary to keep
+            -- memory usage under control.
+            liftIO $ withSQLite dbFp $ saveModuleExports pid mn me
+            pure ()
         logErrors e = do
             logError $ "[Step 6] ERROR cannot get exports for " <> getName p <> ": " 
                      <> T.pack (displayException e)

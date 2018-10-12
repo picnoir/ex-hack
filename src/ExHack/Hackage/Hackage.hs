@@ -2,6 +2,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module ExHack.Hackage.Hackage (
     findComponentRoot,
+    getModExports,
+    getModNames,
     getPackageExports,
     unpackHackageTarball,
     PackageExports(..)
@@ -50,9 +52,12 @@ getModNames p = maybe mempty mods exMods
 -- | Retrieve the exported symbols of a module.
 getModExports :: forall m. (MonadIO m, MonadThrow m, MonadLog m) 
             => PackageFilePath -> [ComponentRoot] -> ModuleName -> m ModuleExports
-getModExports pfp croots mn = do
-    cr <- findComponentRoot pfp croots mn
-    GHC.getDesugaredMod pfp cr mn >>= \m -> pure (mn, force $ GHC.getModExports m)
+getModExports pfp@(PackageFilePath pfps) croots mn = 
+    liftIO $ withCurrentDirectory pfps $ do
+        cr <- findComponentRoot pfp croots mn
+        ds <- GHC.getDesugaredMod pfp cr mn 
+        let !exps = force $ GHC.getModExports ds
+        pure (mn, exps)
 
 -- | Retrieve the exported symbols of a package, module by module.
 getPackageExports :: forall m. (MonadIO m, MonadThrow m, MonadLog m)

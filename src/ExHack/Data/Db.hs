@@ -14,6 +14,7 @@ Portability : POSIX
 module ExHack.Data.Db (
     getHomePagePackages,
     getModulePageSyms,
+    getPackageId,
     getPackagePageMods,
     getPkgImportScopes,
     initDb,
@@ -52,7 +53,8 @@ import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
                                          SourceCodeFile (..), SymName (..),
                                          UnifiedSym (..), depsNames, getModName,
                                          getName)
-import qualified ExHack.Types           as ET (ModuleExports, Package (..))
+import qualified ExHack.Types           as ET (ModuleExports, ModuleName,
+                                               Package (..))
 
 packageId   :: Selector (RowID :*: Text) RowID
 packageName :: Selector (RowID :*: Text) Text
@@ -179,9 +181,11 @@ savePackageMods p xs = do
 
 -- | Given a module database ID, saves the exported symbols of this
 --   module in ExHack's database.
-saveModuleExports :: (MonadSelda m) => Int -> [SymName] -> m ()
-saveModuleExports midi xs = insert_ exposedSymbols $ 
-    (\(SymName s) -> def :*: s :*: fromSql (SqlInt midi)) <$> xs
+saveModuleExports :: (MonadSelda m) => RowID -> ET.ModuleName -> [SymName] -> m ()
+saveModuleExports pid mn xs = do
+    midi <- insertWithPK exposedModules [def :*: getModName mn :*: pid]
+    insert_ exposedSymbols $ 
+        (\(SymName s) -> def :*: s :*: midi) <$> xs
 
 queryPkg :: (MonadSelda m) => ET.Package -> m (Maybe RowID)
 queryPkg p = do
