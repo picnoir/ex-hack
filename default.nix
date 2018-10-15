@@ -1,48 +1,40 @@
-{ compiler ? "ghc843"
-, rev     ? "cd3283f9218b70fdf39640ba1be6fa16e137c209"
-, sha256  ? "1kwffir31hnp1q7cs6h6vgbi4n3byhrv343k99kirp6sf87k99dm"
-, pkgs ?
-    if builtins.compareVersions builtins.nixVersion "2.0" < 0
-    then abort "Exhs requires at least nix 2.0"
-    else import (builtins.fetchTarball {
-           url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
-           inherit sha256; }) {
-           config.allowUnfree = true;
-           config.allowBroken = false;
-         }
- , returnShellEnv ? pkgs.lib.inNixShell
- , mkDerivation ? null
-
- , doStrict ? false
+{ compiler  ? "ghc843"
+, rev       ? "f9002b83fd1998a6cc6fb8d66b8c9752b42c7fcd"
+, sha256    ? "19cb7rf2yv933k5p6mc60i2wqwy7i1ralrb49gvma65f1kipk0rv"
 }:
+
 let
-  haskellPackages = pkgs.haskell.packages.${compiler};
-
-in haskellPackages.developPackage {
-  root = ./.;
-  source-overrides = {
+  config = {
+    packageOverrides = pkgs: rec {
+      haskell = pkgs.haskell // {
+        packages = pkgs.haskell.packages // {
+          "${compiler}" = pkgs.haskell.packages."${compiler}".override {
+            overrides = super: self: {
+              cabal-helper = pkgs.haskell.lib.doJailbreak 
+                (super.callPackage ./nix/cabal-helper.nix {});
+              selda-sqlite = pkgs.haskell.lib.doJailbreak 
+                (super.callPackage ./nix/selda-sqlite.nix {});
+              ex-hack = super.callPackage ./nix/ex-hack.nix {};
+            };
+          };
+        };
+      };
+    };
   };
-  modifier = drv: pkgs.haskell.lib.overrideCabal drv (attrs: {
-    testHaskellDepends = attrs.testHaskellDepends ++
-    [ pkgs.nix
 
-        # Use the same version of hpack no matter what the compiler version
-        # is, so that we know exactly what the contents of the generated
-        # .cabal file will be. Otherwise, Travis may error out claiming that
-        # the cabal file needs to be updated because the result is different
-        # that the version we committed to Git.
-        pkgs.haskell.packages.ghc843.hpack
+  buildTools = with pkgs; 
+    [ zlib gmp sqlite python36Packages.pygments 
+      haskell.packages.${compiler}.cabal-install 
+    ];
 
-        (let cabalInstallVersion = {
-            ghc843 = "2.2.0.0"; 
-            ghc822 = "2.0.0.1";
-        }; in
-        haskellPackages.callHackage "cabal-install"
-        cabalInstallVersion.${compiler} {})
-      ];
-    configureFlags = 
-      pkgs.stdenv.lib.optional doStrict "--ghc-options=-Werror";
-   });
+  pkgs = import (builtins.fetchTarball {
+     url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
+     inherit sha256; }) {inherit config;};
 
-   inherit returnShellEnv;
-}
+  in
+
+  { 
+    ex-hack = pkgs.haskell.lib.addBuildTools
+                pkgs.haskell.packages.${compiler}.ex-hack 
+                buildTools;
+  }
