@@ -4,6 +4,10 @@
 }:
 
 let
+  pkgs = import (builtins.fetchTarball {
+     url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
+     inherit sha256; }) {inherit config;};
+
   config = {
     packageOverrides = pkgs: rec {
       haskell = pkgs.haskell // {
@@ -14,7 +18,10 @@ let
                 (super.callPackage ./nix/cabal-helper.nix {});
               selda-sqlite = pkgs.haskell.lib.doJailbreak 
                 (super.callPackage ./nix/selda-sqlite.nix {});
-              ex-hack = super.callPackage ./nix/ex-hack.nix {};
+                ex-hack = super.callPackage ./nix/ex-hack.nix {
+                  cabal-install = haskell.packages.${compiler}.cabal-install;
+                  pygments = pkgs.python36Packages.pygments;
+                };
             };
           };
         };
@@ -23,13 +30,9 @@ let
   };
 
   buildTools = with pkgs; 
-    [ zlib gmp sqlite python36Packages.pygments 
+    [ zlib gmp sqlite
       haskell.packages.${compiler}.cabal-install 
     ];
-
-  pkgs = import (builtins.fetchTarball {
-     url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
-     inherit sha256; }) {inherit config;};
 
   in
 

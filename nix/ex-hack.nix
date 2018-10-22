@@ -1,8 +1,8 @@
 { mkDerivation, ansi-terminal, base, blaze-html, bytestring, Cabal
-, cabal-helper, containers, deepseq, directory, exceptions
+, cabal-helper, cabal-install, containers, deepseq, directory, exceptions
 , file-embed, filepath, ghc, ghc-paths, hashable, hspec
 , http-client, http-client-tls, lens, mtl, network-uri
-, optparse-applicative, process, safe, selda, selda-sqlite
+, optparse-applicative, process, pygments, safe, selda, selda-sqlite
 , shakespeare, stdenv, tar, text, unordered-containers, yaml, zlib
 }:
 mkDerivation {
@@ -27,4 +27,9 @@ mkDerivation {
   ];
   homepage = "https://github.com/TORELEASE";
   license = stdenv.lib.licenses.gpl3;
+  # We need to rewrite the runtime binary dependencies to their correct nix path.
+  postConfigure = ''
+          substituteInPlace src/ExHack/Cabal/Cabal.hs --replace 'cabalPath = "cabal"' 'cabalPath = "${cabal-install}/bin/cabal"'
+          substituteInPlace src/ExHack/Renderer/Html.hs --replace '"pygmentize"' '"${pygments}/bin/pygmentize"'
+        '';
 }
