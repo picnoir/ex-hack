@@ -11,7 +11,6 @@ module ExHack.Cabal.Cabal (
 ) where
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Maybe             (isJust)
 import           System.Directory       (withCurrentDirectory)
 import           System.Environment     (unsetEnv)
 import           System.Exit            (ExitCode (..))
@@ -28,15 +27,12 @@ import           ExHack.Types           (PackageFilePath (..))
 buildPackage :: MonadIO m => PackageFilePath -> m (Maybe (Int, String))
 buildPackage (PackageFilePath pfp) = liftIO $ withCurrentDirectory pfp cabalBuild
   where
-    cabalBuild = do
-        rid <- installDeps
-        if isJust rid
-            then pure rid
-            else build
+    cabalBuild = initStack >> build
 
--- TODO: do not hardcode resolver
-installDeps :: MonadIO m => m (Maybe (Int, String))
-installDeps = runCabalCommand ["init", "--resolver", "lts-12.11", "--omit-packages"]
+-- TODO: remove hardcoded resolver
+initStack :: MonadIO m => m ()
+initStack = 
+    liftIO $ writeFile "stack.yaml" "resolver: lts-12.11\nallow-newer: true\n"
 
 build :: MonadIO m => m (Maybe (Int, String))
 build = runCabalCommand ["build", "--resolver", "lts-12.11"]

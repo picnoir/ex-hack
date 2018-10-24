@@ -54,14 +54,13 @@ spec = do
           exports <- getPackageExports tbp p
           exports `shouldBe` [("System.TimeIt", ["timeIt", "timeItT"])]
           -- Currently broken, see stack init problem.
-        {-it "should retrieve text exports" $ do
+        it "should retrieve text exports" $ do
           tbp <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/text.tar.gz")
           _ <- buildPackage tbp
           pd <- getPackageDesc tbp
           let p = fromJust $ parseCabalFile $ fromJust pd
           exports <- getPackageExports tbp p
           exports `shouldBe` textExports
-          -}
     before cleanWorkdir $ describe "processing steps" $
         it "should perform a e2e run with a reduced set of packages" $ do
             _ <- unpackHackageTarball workDir $(embedFile "./test/integration/fixtures/tarballs/timeit.tar.gz")
