@@ -19,7 +19,7 @@ let
               selda-sqlite = pkgs.haskell.lib.doJailbreak 
                 (super.callPackage ./nix/selda-sqlite.nix {});
                 ex-hack = super.callPackage ./nix/ex-hack.nix {
-                  cabal-install = haskell.packages.${compiler}.cabal-install;
+                  stack = pkgs.stack;
                   pygments = pkgs.python36Packages.pygments;
                 };
             };

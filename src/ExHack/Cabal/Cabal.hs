@@ -34,11 +34,12 @@ buildPackage (PackageFilePath pfp) = liftIO $ withCurrentDirectory pfp cabalBuil
             then pure rid
             else build
 
+-- TODO: do not hardcode resolver
 installDeps :: MonadIO m => m (Maybe (Int, String))
-installDeps = runCabalCommand ["install","--dependencies-only", "--force-reinstalls"]
+installDeps = runCabalCommand ["init", "--resolver", "lts-12.11", "--omit-packages"]
 
 build :: MonadIO m => m (Maybe (Int, String))
-build = runCabalCommand ["build"]
+build = runCabalCommand ["build", "--resolver", "lts-12.11"]
 
 runCabalCommand :: MonadIO m => [String] -> m (Maybe (Int, String))
 runCabalCommand cmd = do
@@ -49,4 +50,4 @@ runCabalCommand cmd = do
     ExitSuccess -> pure Nothing
     ExitFailure i -> pure $ Just (i, err)
   where
-    cabalPath = "cabal"
+    cabalPath = "stack"

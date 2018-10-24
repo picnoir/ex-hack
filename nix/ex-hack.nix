@@ -1,9 +1,9 @@
 { mkDerivation, ansi-terminal, base, blaze-html, bytestring, Cabal
-, cabal-helper, cabal-install, containers, deepseq, directory, exceptions
+, cabal-helper, containers, deepseq, directory, exceptions
 , file-embed, filepath, ghc, ghc-paths, hashable, hspec
 , http-client, http-client-tls, lens, mtl, network-uri
 , optparse-applicative, process, pygments, safe, selda, selda-sqlite
-, shakespeare, stdenv, tar, text, unordered-containers, yaml, zlib
+, shakespeare, stdenv, tar, text, unordered-containers, yaml, zlib, stack
 }:
 mkDerivation rec {
   pname = "ex-hack";
@@ -38,8 +38,7 @@ mkDerivation rec {
   # We also need to update cabal-install local database. If we don't do this, cabal-helper will 
   # fail building its helper binary and this will make the integration tests fail.
   postConfigure = ''
-          substituteInPlace src/ExHack/Cabal/Cabal.hs --replace 'cabalPath = "cabal"' 'cabalPath = "${cabal-install}/bin/cabal"'
+          substituteInPlace src/ExHack/Cabal/Cabal.hs --replace 'cabalPath = "cabal"' 'cabalPath = "${stack}/bin/stack"'
           substituteInPlace src/ExHack/Renderer/Html.hs --replace '"pygmentize"' '"${pygments}/bin/pygmentize"'
-          ${cabal-install}/bin/cabal update
         '';
 }

@@ -7,6 +7,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 module ExHack.Ghc (
   UnitId(..),
   TypecheckedSource,
@@ -20,7 +21,7 @@ module ExHack.Ghc (
 
 import           Avail                   (AvailInfo (..))
 import           Control.DeepSeq         (force)
-import           Control.Monad           (when)
+import           Control.Monad           (when, liftM2)
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Maybe              (fromMaybe, isNothing)
 import           Data.Text               (pack)
@@ -47,7 +48,7 @@ import           Lexer                   (Token (ITqvarid, ITvarid))
 import           Module                  (UnitId (..))
 import           Name                    (getOccString)
 import           Safe                    (headMay)
-import           System.Directory        (withCurrentDirectory)
+import           System.Directory        (withCurrentDirectory, listDirectory)
 import           System.FilePath         ((<.>), (</>))
 
 import           ExHack.ModulePaths      (modName)
@@ -96,12 +97,21 @@ getModSymbols p pfp cr@(ComponentRoot crt) mn =
             (<$$>) = fmap . fmap
             fileName = crt </> toFilePath mn <.> "hs"
 
-getCabalDynFlagsLib :: (MonadIO m) => FilePath -> m (Maybe [String])
+getCabalDynFlagsLib :: forall m. (MonadIO m) => FilePath -> m (Maybe [String])
 getCabalDynFlagsLib fp = do
-    let qe = H.mkQueryEnv fp (fp </> "dist")
+    mdir <- getDistDir
+    let dist = fromMaybe "dist" mdir
+    let qe = H.mkQueryEnv fp (fp </> dist)
     cs <- H.runQuery qe $ H.components $ (,) <$> H.ghcOptions
     pure $ fst <$> headMay (filter getLib cs)
   where
+    getDistDir :: m (Maybe FilePath)
+    getDistDir = do
+        platformDir <- liftIO $ listDirectory $ ".stack-work" </> "dist"
+        let mpd = ((".stack-work" </> "dist") </>) <$> headMay platformDir
+        cabalInstallDir <- liftIO $ mapM listDirectory mpd 
+        let mid = headMay =<< cabalInstallDir
+        pure $ liftM2 (</>) mpd mid
     getLib (_,H.ChLibName) = True
     getLib _ = False
 
