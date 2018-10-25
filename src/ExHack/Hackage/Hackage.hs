@@ -18,7 +18,7 @@ import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString        as BS (ByteString)
 import qualified Data.ByteString.Lazy   as BL (fromStrict)
 import           System.Directory       (makeAbsolute, withCurrentDirectory)
-import           System.FilePath        (FilePath, (</>))
+import           System.FilePath        (FilePath, splitDirectories, (</>))
 
 import qualified ExHack.Ghc             as GHC (getDesugaredMod, getModExports)
 import           ExHack.ModulePaths     (findComponentRoot)
@@ -40,7 +40,10 @@ unpackHackageTarball dir tb = do
   adir <- liftIO $ makeAbsolute dir
   pure $ PackageFilePath $ adir </> getRootPath rp 
   where
-    getRootPath (Tar.Next e _) = Tar.entryPath e
+    -- TODO: unsafe head here. We are pretty sure we'll have at least a basedir
+    -- since the tarballs we are unpacking are haskell packages. However, it would
+    -- be nice to incorporate this in the API design.
+    getRootPath (Tar.Next e _) = head $ splitDirectories $ Tar.entryPath e
     getRootPath _ = error "Cannot find tar's root directory."
 
 getModNames :: Package -> [ModuleName]
