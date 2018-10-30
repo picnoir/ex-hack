@@ -6,7 +6,7 @@ License     : GPL-3
 Stability   : experimental
 Portability : POSIX
 -}
-module ExHack.Cabal.Cabal (
+module ExHack.Stackage.Stack (
   buildPackage
 ) where
 

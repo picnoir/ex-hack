@@ -53,7 +53,6 @@ library
       yaml                 >= 0.8.32,
       zlib                 >= 0.6
   exposed-modules:
-      ExHack.Cabal.Cabal,
       ExHack.Cabal.CabalParser,
       ExHack.Data.Db,
       ExHack.Ghc,
@@ -62,6 +61,7 @@ library
       ExHack.ProcessingSteps,
       ExHack.Renderer.Html,
       ExHack.Renderer.Types,
+      ExHack.Stackage.Stack,
       ExHack.Stackage.StackageParser,
       ExHack.Stackage.StackageTypes,
       ExHack.Types,

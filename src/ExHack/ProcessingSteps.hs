@@ -60,7 +60,6 @@ import           System.IO                      (IOMode (WriteMode),
                                                  hSetEncoding, utf8, withFile)
 import           Text.Blaze.Html.Renderer.Text  (renderHtml)
 
-import           ExHack.Cabal.Cabal             (buildPackage)
 import           ExHack.Cabal.CabalParser       (parseCabalFile)
 import           ExHack.Data.Db                 (getHomePagePackages,
                                                  getModulePageSyms,
@@ -87,6 +86,7 @@ import qualified ExHack.Renderer.Types          as RT (HighlightedSourceCodeFile
                                                        PackageName (..),
                                                        SymbolOccurs (..),
                                                        renderRoute)
+import           ExHack.Stackage.Stack          (buildPackage)
 import           ExHack.Stackage.StackageParser (getHackageUrls,
                                                  parseStackageYaml)
 import           ExHack.Types                   (AlterDatabase,

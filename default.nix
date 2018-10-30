@@ -30,7 +30,7 @@ let
   };
 
   buildTools = with pkgs; 
-    [ zlib gmp sqlite
+    [ zlib gmp sqlite python36Packages.pygments
       haskell.packages.${compiler}.cabal-install 
     ];
 

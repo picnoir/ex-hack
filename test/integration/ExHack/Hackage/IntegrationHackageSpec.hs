@@ -16,7 +16,6 @@ import           System.FilePath          (equalFilePath, (</>))
 import           Test.Hspec               (Spec, before, describe, it, shouldBe,
                                            shouldSatisfy)
 
-import           ExHack.Cabal.Cabal       (buildPackage)
 import           ExHack.Cabal.CabalParser (parseCabalFile)
 import           ExHack.Hackage.Hackage   (PackageExports (..),
                                            getPackageExports,
@@ -24,6 +23,7 @@ import           ExHack.Hackage.Hackage   (PackageExports (..),
 import           ExHack.ProcessingSteps   (genGraphDep, generateDb,
                                            generateHtmlPages, indexSymbols,
                                            retrievePkgsExports, saveGraphDep)
+import           ExHack.Stackage.Stack    (buildPackage)
 import           ExHack.Types             (CabalFilesDir (..), Config (..),
                                            DatabaseStatus (..), HtmlDir (..),
                                            ModuleName, PackageDesc (..),
