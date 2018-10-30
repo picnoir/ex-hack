@@ -36,12 +36,18 @@ import           ExHack.Types        (ModuleNameT, PackageNameT,
 
 newtype PackageName            = PackageName (RowID, Text)
     deriving (Eq, Show, Generic)
+
 newtype ModuleName             = ModuleName (RowID, Text)
     deriving (Eq, Show, Generic)
+
+-- Source code file that has been highligthed by pygments.
 data HighlightedSourceCodeFile = HighlightedSourceCodeFile !Text !ModuleNameT !PackageNameT
     deriving (Eq, Show, Generic)
+
 type SymbolName                = Text
+
 type Col                       = Int
+
 type Line                      = Int
 
 -- | Renderer's routing datatype

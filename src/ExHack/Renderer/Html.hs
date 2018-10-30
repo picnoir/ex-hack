@@ -34,6 +34,7 @@ import           ExHack.Renderer.Types  (HighLightError (..),
                                          PackageName (..), Route (..))
 import           ExHack.Types           (ModuleNameT (..), PackageNameT (..))
 
+-- | Highlights the source file using pygments.
 highLightCode :: forall m. (MonadIO m, MonadMask m) => T.Text -> m T.Text
 highLightCode t = do
     (ec,out,err) <- liftIO $ readProcessWithExitCode 
@@ -44,6 +45,7 @@ highLightCode t = do
         ExitSuccess -> pure $ T.pack out
         ExitFailure _ -> throwM $ HighLightError err
 
+-- | Adds an arrow pointing to the selected symbol.
 addLineMarker :: Int -> T.Text -> T.Text
 addLineMarker line t = let slm = headMay end
     in maybe t (\l -> T.unlines $ start <> [wrapL l] <> drop 1 end) slm  
@@ -59,18 +61,21 @@ getHeader pageTitle = $(hamletFile "./src/ExHack/Renderer/templates/header.hamle
 menu :: HtmlUrl Route
 menu = $(hamletFile "./src/ExHack/Renderer/templates/menu.hamlet")
 
+-- | Template rendered in order to create the home page.
 homePageTemplate :: [HomePagePackage] -> HtmlUrl Route
 homePageTemplate packages = 
     $(hamletFile "./src/ExHack/Renderer/templates/homePage.hamlet")
   where
     header = getHeader "The Haskell Examples Database"
 
+-- | Template rendered in order to create a package's page.
 packagePageTemplate :: HomePagePackage -> [ModuleName] ->  HtmlUrl Route
 packagePageTemplate pack@(HomePagePackage (PackageName (_,pn)) _) mods = 
     $(hamletFile "./src/ExHack/Renderer/templates/packagePage.hamlet")
   where
     header = getHeader $ pn <> " usage examples"
 
+-- | Template rendered in order to create a module's page.
 modulePageTemplate :: HomePagePackage -> ModuleName -> [HighlightedSymbolOccurs] -> HtmlUrl Route
 modulePageTemplate _ (ModuleName (_,mname)) soccs = 
     $(hamletFile "./src/ExHack/Renderer/templates/modulePage.hamlet")

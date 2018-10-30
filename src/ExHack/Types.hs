@@ -377,7 +377,9 @@ data PackageExports = PackageExports Package PackageFilePath [(ModuleName, [SymN
   deriving (Show, Eq, Generic)
 instance NFData PackageExports 
 
+-- | Type encapsulating the exported symbols of a module.
 type ModuleExports = (ModuleName, [SymName])
+
 -- | Symbols imported in a module file.
 --
 --   This datastructure is about optimizing the lookups, allowing us to
