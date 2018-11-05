@@ -4,6 +4,7 @@
 , http-client, http-client-tls, lens, mtl, network-uri
 , optparse-applicative, process, pygments, safe, selda, selda-sqlite
 , shakespeare, stdenv, tar, text, unordered-containers, yaml, zlib, stack
+, profile
 }:
 mkDerivation rec {
   pname = "ex-hack";
@@ -25,6 +26,7 @@ mkDerivation rec {
   # the test deps to run cabal test in the CI Script. With doCheck disabled,
   # we won't get the test deps in scope, so instead, we force them as build deps.
   buildDepends = testHaskellDepends;
+  enableLibraryProfiling = profile;
   executableHaskellDepends = [
     base directory filepath lens optparse-applicative text
   ];
@@ -38,7 +40,7 @@ mkDerivation rec {
   # We also need to update cabal-install local database. If we don't do this, cabal-helper will 
   # fail building its helper binary and this will make the integration tests fail.
   postConfigure = ''
-          substituteInPlace src/ExHack/Cabal/Cabal.hs --replace 'cabalPath = "cabal"' 'cabalPath = "${stack}/bin/stack"'
+          substituteInPlace src/ExHack/Stackage/Stack.hs --replace 'stackPath = "stack"' 'stackPath = "${stack}/bin/stack"'
           substituteInPlace src/ExHack/Renderer/Html.hs --replace '"pygmentize"' '"${pygments}/bin/pygmentize"'
         '';
 }

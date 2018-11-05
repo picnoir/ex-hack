@@ -1,6 +1,7 @@
 { compiler  ? "ghc843"
 , rev       ? "f9002b83fd1998a6cc6fb8d66b8c9752b42c7fcd"
 , sha256    ? "19cb7rf2yv933k5p6mc60i2wqwy7i1ralrb49gvma65f1kipk0rv"
+, profile   ? false
 }:
 
 let
@@ -20,6 +21,7 @@ let
                 (super.callPackage ./nix/selda-sqlite.nix {});
                 ex-hack = super.callPackage ./nix/ex-hack.nix {
                   stack = pkgs.stack;
+                  profile = profile;
                   pygments = pkgs.python36Packages.pygments;
                 };
             };
