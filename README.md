@@ -1,8 +1,8 @@
 # Ex-Hack: the Hackage Example Database
 
-![Ex-Hack Logo](TODO)
+![Ex-Hack Logo](img/logo/ex-hack-full.svg)
 
-*[Ex-Hack-tement Jamy!](https://en.wikipedia.org/wiki/C%27est_pas_sorcier)*
+*[Ex-Hack-tement Jamy!](https://en.wikipedia.org/wiki/Jamy_Gourmaud)*
 
 Ex-Hack, shorthand for Hackage EXamples is a Haskell example-based
 documentation.
@@ -25,13 +25,13 @@ It may be useful:
   wild before performing an API refactoring.
 
 **/!\ Again, this is an alpha release.** We may miss a lot of symbols
-occurrences, please do not use this tool as a way to asses your API usages.
+occurrences, please do not use this tool as a way to asses your API usages yet.
 
 ## How to Use?
 
 1. Build and install ex-hack.
 1. Download a Stackage build plan from [this
-   repo](https://github.com/commercialhaskell/lts-haskell). **NOTE**: Ex-Hack
+   repo](https://github.com/commercialhaskell/lts-haskell). **Note**: Ex-Hack
    not yet compatible with the GHC 8.6 line.
 1. Run ex-hack -s ${stackageFile} to generate the documentation. **Note**: this
    process will download, build and index the whole Stackage packages. It will
@@ -145,7 +145,6 @@ cabal test
 cabal test unit-tests
 # Run integration tests only
 cabal test integration-tests
-
 ```
 
 Unfortunately, you can't test ex-hack using the nix-build command. For some
