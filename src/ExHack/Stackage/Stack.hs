@@ -25,9 +25,9 @@ import           ExHack.Types           (PackageFilePath (..))
 --   Returns both the exit code and the detailed error message in case
 --   of error.
 buildPackage :: MonadIO m => PackageFilePath -> m (Maybe (Int, String))
-buildPackage (PackageFilePath pfp) = liftIO $ withCurrentDirectory pfp cabalBuild
+buildPackage (PackageFilePath pfp) = liftIO $ withCurrentDirectory pfp stackBuild
   where
-    cabalBuild = initStack >> build
+    stackBuild = initStack >> build
 
 -- TODO: remove hardcoded resolver
 initStack :: MonadIO m => m ()
@@ -41,9 +41,9 @@ runCabalCommand :: MonadIO m => [String] -> m (Maybe (Int, String))
 runCabalCommand cmd = do
   liftIO $ unsetEnv "GHC_PACKAGE_PATH"
   (ec, _, err) <- liftIO $ readProcessWithExitCode
-      cabalPath cmd ""
+      stackPath cmd ""
   case ec of
     ExitSuccess -> pure Nothing
     ExitFailure i -> pure $ Just (i, err)
   where
-    cabalPath = "stack"
+    stackPath = "stack"

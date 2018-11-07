@@ -36,9 +36,6 @@ mkDerivation rec {
   homepage = "https://github.com/TORELEASE";
   license = stdenv.lib.licenses.gpl3;
   # We need to rewrite the runtime binary dependencies to their correct nix path.
-  #
-  # We also need to update cabal-install local database. If we don't do this, cabal-helper will 
-  # fail building its helper binary and this will make the integration tests fail.
   postConfigure = ''
           substituteInPlace src/ExHack/Stackage/Stack.hs --replace 'stackPath = "stack"' 'stackPath = "${stack}/bin/stack"'
           substituteInPlace src/ExHack/Renderer/Html.hs --replace '"pygmentize"' '"${pygments}/bin/pygmentize"'
