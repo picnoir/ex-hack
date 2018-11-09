@@ -1,4 +1,4 @@
-# Ex-Hack: the Hackage Example Database
+# Ex-Hack: Hackage Example Database
 
 ![Ex-Hack Logo](img/logo/ex-hack-full.svg)
 
@@ -7,7 +7,7 @@
 Ex-Hack, shorthand for Hackage EXamples is a Haskell example-based
 documentation.
 
-**Note: This this an alpha release. See the How to Contribute section to help us
+**Note: This is an alpha release. See the How to Contribute section to help us
 making this tool more reliable/complete.**
 
 ![Screenshot showing Ex-Hack HTML documentation](TODO)
@@ -19,13 +19,12 @@ stackage build plan.
 
 It may be useful:
 
-- For stackage users to learn how to use a library missing a proper
-  documentation 
+- For stackage users to learn how to use a library missing proper documentation 
 - For library maintainers as a way to see which symbols are mostly used in the
   wild before performing an API refactoring.
 
 **/!\ Again, this is an alpha release.** We may miss a lot of symbols
-occurrences, please do not use this tool as a way to asses your API usages yet.
+occurrences, please do not use this tool as a way to assess your API usage yet.
 
 ## How to Use?
 
@@ -39,7 +38,7 @@ occurrences, please do not use this tool as a way to asses your API usages yet.
 
 ## How to Contribute?
 
-Find an issue to work on, fork the repo, submit a PR.
+Find an issue to work on, fork the repo and submit a PR.
 
 TODO: re-write this section according to the gh issue tags.
 
@@ -68,7 +67,7 @@ There are currently 8 processing steps:
    look for occurrences of the symbols retrieved in the previous step.
 8. **Generate the HTML documentation**: we render the ex-hack SQLite database
    into a static HTML documentation. This documentation can either be served on
-   the web, either consulted locally.
+   the web, or consulted locally.
 
 
 ## Development Tooling
@@ -77,10 +76,10 @@ You can either use [Nix](https://nixos.org/nix/) or
 [Stack](https://hackage.haskell.org/package/stack) to build/install ex-hack.
 
 Both the project's maintainer and the CI are using Nix as the primary build
-tool, the stack build may be broken. If it's the case, please open an issue and
-submit a PR fixing the issue (if you can :)).
+tool, the stack build may be broken. If that's the case, please open an issue
+and submit a PR fixing the issue (if you can :)).
 
-**Note:** You don't necesseraly need NixOS to use Nix, you probably can do it on your
+**Note:** You don't necessarily need NixOS to use Nix, you probably can do it on your
 favorite OS.
 
 ## Using Cachix as Binary Cache
