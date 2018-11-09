@@ -1,5 +1,6 @@
 <div id="page-header">
-    <a class="caption" href="@{HomePage}">ExHack :: Haskell (ExamplesDatabase) 
+    <img src="/static/ex-hack-logo.svg" class="ex-hack-logo" alt="Ex-Hack logo">
+    <a class="caption" href="@{HomePage}">ExHack :: Haskell Examples Database
     <ul class="links" id="page-menu">
         <li>
             <a href="@{HomePage}"> Browse Packages

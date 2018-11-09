@@ -438,15 +438,17 @@ generateHtmlPages = do
                     pure c 
     copyAssets :: FilePath -> m ()
     copyAssets fp = do
-        let font = $(embedFile "./src/ExHack/Renderer/templates/static/Inter-UI-Regular.woff") 
-            list = $(embedFile "./src/ExHack/Renderer/templates/static/list.min.js") 
-            style = $(embedFile "./src/ExHack/Renderer/templates/static/style.css") 
-            stat = fp </> "static"
+        let font  = $(embedFile "./src/ExHack/Renderer/templates/static/Inter-UI-Regular.woff")
+            list  = $(embedFile "./src/ExHack/Renderer/templates/static/list.min.js")
+            style = $(embedFile "./src/ExHack/Renderer/templates/static/style.css")
+            logo  = $(embedFile "./img/logo/ex-hack-logo.svg")
+            stat  = fp </> "static"
         liftIO $ do
             createDirectoryIfMissing True stat
             BS.writeFile (stat </> "Inter-UI-Regular.woff") font
             BS.writeFile (stat </> "list.min.js") list 
             BS.writeFile (stat </> "style.css") style
+            BS.writeFile (stat </> "ex-hack-logo.svg") logo 
     writeUtf8File :: FilePath -> TL.Text -> IO ()
     writeUtf8File fp txt = 
         withFile (fp </> "index.html")

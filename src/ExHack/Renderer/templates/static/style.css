@@ -449,7 +449,6 @@ table.properties td, table.properties th {
 }
 
 #page-header .caption {
-  background: url(https://hackage.haskell.org/static/icons/ic_haskell_grayscale_32.svg) no-repeat 0em;
   color: white;
   margin: 0;
   font-weight: bold;
@@ -959,6 +958,10 @@ p.tip {
 
 .embedded-author-content img {
   max-width: 100%;
+}
+
+.ex-hack-logo{
+  width: 30px;
 }
 
 /* Misc admin forms */
