@@ -99,6 +99,7 @@ parseOpts = do
         dftcabal    = dataDir </> "cabal-files"
         dftworkdir  = dataDir </> "workdir"
         dftdb       = dataDir </> "database.sqlite"
+        dftoutdir   = dataDir </> "output"
     let parser = Config 
             <$> (newDatabaseHandle <$> strOption
                 (long "database-filepath"
@@ -132,11 +133,11 @@ parseOpts = do
             <*> (HtmlDir <$> strOption
                 (long "output-directory"
                 <> short 'w'
-                <> value dftworkdir
+                <> value dftoutdir
                 <> metavar "OUTDIR"
                 <> help "Directory where exhack HTML documentation will be saved"))
             <*> switch 
                 (long "create-dirs"
                 <> short 'n'
                 <> help "Create the tarball, cabal and working directories if they do not exists on the filesystem")
-    execParser $ info parser (failureCode 1) 
+    execParser $ info (parser <**> helper) (failureCode 1) 
