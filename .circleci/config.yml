@@ -12,4 +12,4 @@ jobs:
           command: 'sudo mkdir -p /nix && sudo chown circleci /nix && curl https://nixos.org/nix/install | sh && echo "source ~/.nix-profile/etc/profile.d/nix.sh" >> ~/.circlerci'
       - run:
           name: Run Ex-Hack test suite
-          command: 'source ~/.circlerci && nix-shell && cabal test'
+          command: 'source ~/.circlerci && nix-shell --run "cabal test"'
