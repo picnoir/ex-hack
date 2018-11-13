@@ -11,7 +11,7 @@ jobs:
           name: Install Nix
           # Note: we need to install stack since we can't run the tests directly from the nix-build 
           # command because of some cabal-helper dark magic.
-          command: 'sudo mkdir -p /nix && sudo chown circleci /nix && curl https://nixos.org/nix/install | sh && echo "source ~/.nix-profile/etc/profile.d/nix.sh" >> ~/.circleci && source ~/.circleci && nix-env -i stack'
+          command: 'sudo mkdir -p /nix && sudo chown circleci /nix && curl https://nixos.org/nix/install | sh && echo "source ~/.nix-profile/etc/profile.d/nix.sh" >> ~/.circleci && source ~/.circleci'
       - run:
           name: Run Ex-Hack test suite
           command: 'source ~/.circleci && mkdir -p test/integration/workdir test/integration/output && nix-shell --run "cabal test"'
