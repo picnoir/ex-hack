@@ -6,9 +6,9 @@ module Main where
 
 import           Control.Lens.Getter    ((^.))
 import           Control.Monad          (when)
-import           Options.Applicative    (execParser, failureCode, help, info,
-                                         long, metavar, short, strOption,
-                                         switch, value)
+import           Options.Applicative    (execParser, failureCode, help, helper,
+                                         info, long, metavar, short, strOption,
+                                         switch, value, (<**>))
 import           System.Directory       (XdgDirectory (XdgData),
                                          createDirectoryIfMissing,
                                          getXdgDirectory, listDirectory,
