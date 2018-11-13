@@ -4,8 +4,8 @@ jobs:
     machine: true
     steps:
       - restore_cache:
-        keys:
-          - nix-store
+          keys:
+            - nix-store
       - checkout
       - run:
           name: Install Nix
