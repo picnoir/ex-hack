@@ -31,7 +31,7 @@ mkDerivation rec {
     base directory filepath lens optparse-applicative text
   ];
   testHaskellDepends = [
-    base containers directory file-embed filepath hspec text
+    base containers directory file-embed filepath hspec text stack
   ];
   homepage = "https://github.com/TORELEASE";
   license = stdenv.lib.licenses.gpl3;
