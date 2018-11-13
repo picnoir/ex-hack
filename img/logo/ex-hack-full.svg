@@ -6,9 +6,9 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
-   viewBox="0 0 825.89173 843.87164"
-   height="843.87164"
-   width="825.89172"
+   viewBox="0 0 300 300"
+   height="300"
+   width="300"
    id="svg4572"
    version="1.1">
   <metadata
@@ -376,7 +376,7 @@
     </filter>
     <filter
        id="filter1251"
-       style="color-interpolation-filters:sRGB;">
+       style="color-interpolation-filters:sRGB">
       <feFlood
          id="feFlood1241"
          result="flood"
@@ -407,7 +407,7 @@
     </filter>
     <filter
        id="filter1263"
-       style="color-interpolation-filters:sRGB;">
+       style="color-interpolation-filters:sRGB">
       <feFlood
          id="feFlood1253"
          result="flood"
@@ -438,26 +438,30 @@
     </filter>
   </defs>
   <path
+     transform="matrix(0.32841492,0,0,0.32841492,107.5943,120.92463)"
      id="path1236"
-     d="m 31.388037,89.250916 -7.847018,231.486774 6.539183,495.66942 222.331928,5.23134 129.47565,10.46268 256.33564,-11.77051 81.39103,-41.17789 59.85513,-22.90603 26.1567,-177.86553 L 745.46587,374.35893 795.1636,255.34595 721.92484,53.939374 649.99393,19.935672 l -279.87666,-5e-6 -139.93833,5.231344 -105.93463,6.53917 z"
+     d="m -251.59431,-241.92158 -7.84702,231.486779 6.53919,495.669421 222.331923,5.23134 129.47565,10.46268 256.335637,-11.77051 81.39103,-41.17789 59.85513,-22.90603 26.1567,-177.86553 -60.16041,-204.022241 49.69773,-119.01298 -73.23876,-201.406579 -71.93091,-34.0037 -279.876657,-10e-6 -139.93833,5.23135 -105.934633,6.53917 z"
      style="fill:#ff6704;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter1263)" />
   <path
+     transform="matrix(0.32841492,0,0,0.32841492,107.5943,120.92463)"
      id="path1234"
-     d="M 122.93648,69.633392 35.311542,439.75067 95.471946,718.31949 445.97169,822.94629 782.08526,693.47063 728.46403,386.12944 780.77742,124.56246 469.51272,21.243502 Z"
+     d="M -160.04587,-261.5391 -247.6708,108.57818 -187.5104,387.147 162.98934,491.7738 499.10291,362.29814 445.48168,54.956949 497.79507,-206.61003 186.53037,-309.92899 Z"
      style="fill:#ff0004;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter1251)" />
   <path
-     transform="matrix(1.1411679,0,0,0.8579336,-27.444072,25.082936)"
+     transform="matrix(0.37477656,0,0,0.28175819,5.6456312,20.400248)"
      id="path1208"
      d="M 174.66965,172.4264 37.927211,272.3478 158.82319,476.77786 168.6557,727.30519 382.36141,639.1407 598.74733,759.69903 638.22342,540.45395 709.43944,372.20169 617.29806,176.87586 646.15174,1.2097253 426.9742,43.077317 237.99884,-4.4547467 Z"
      style="fill:#5e5184;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter1232)" />
   <g
-     transform="translate(66.96057,-26.156709)"
+     transform="translate(66.96057,-570.02835)"
      id="g903">
     <path
+       transform="matrix(0.32841492,0,0,0.32841492,62.624581,503.74717)"
        style="fill:#ffb380;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1.03755796px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1;filter:url(#filter999)"
-       d="M 11.267282,638.5408 V 815.09851 H 661.72595 V 639.14825 Z"
+       d="M -271.71506,851.23995 V 1027.7977 H 378.7436 V 851.8474 Z"
        id="path895" />
     <g
+       transform="matrix(0.32841492,0,0,0.32841492,-30.311049,573.60074)"
        id="text891"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:96px;line-height:125%;font-family:Monaco;-inkscape-font-specification:Monaco;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
        aria-label="Ex-Hack">
@@ -492,7 +496,7 @@
     </g>
   </g>
   <g
-     transform="translate(-72.104642,59.888604)"
+     transform="matrix(0.32841492,0,0,0.32841492,-9.0215688,31.830948)"
      id="g6280">
     <ellipse
        cx="506.63947"
