@@ -1,11 +1,11 @@
 version: 1
 jobs:
   build:
-    dependencies: 
-      cache_directories:
-        - "/nix"
     machine: true
     steps:
+      - restore_cache:
+        keys:
+          - nix-store
       - checkout
       - run:
           name: Install Nix
@@ -15,3 +15,7 @@ jobs:
       - run:
           name: Run Ex-Hack test suite
           command: 'source ~/.circleci && mkdir -p test/integration/workdir test/integration/output && nix-shell --run "cabal test"'
+      - save_cache:
+          key: nix-store 
+          paths:
+            - /nix
