@@ -6,7 +6,7 @@
 
 *[Ex-Hack-tement Jamy!](https://en.wikipedia.org/wiki/Jamy_Gourmaud)*
 
-[Ex-Hack](https://exhack.org), shorthand for Hackage EXamples is a Haskell
+Ex-Hack, shorthand for Hackage EXamples is a Haskell
 example-based documentation.
 
 https://exhack.org
@@ -14,7 +14,7 @@ https://exhack.org
 **Note: This is an alpha release. See the How to Contribute section to help us
 making this tool more reliable/complete.**
 
-[![Screenshot showcasing the Ex-Hack HTML documentation](img/gh-screenshot.jpg)] (https://exhack.org)
+![Screenshot showcasing the Ex-Hack HTML documentation](img/gh-screenshot.jpg)
 
 ## Abstract
 
