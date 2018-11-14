@@ -1,5 +1,7 @@
 # Ex-Hack: Hackage Example Database
 
+[![CircleCI](https://circleci.com/gh/NinjaTrappeur/ex-hack.svg?style=svg)](https://circleci.com/gh/NinjaTrappeur/ex-hack)
+
 ![Ex-Hack Logo](img/logo/ex-hack-full.svg)
 
 *[Ex-Hack-tement Jamy!](https://en.wikipedia.org/wiki/Jamy_Gourmaud)*
@@ -10,7 +12,7 @@ documentation.
 **Note: This is an alpha release. See the How to Contribute section to help us
 making this tool more reliable/complete.**
 
-![Screenshot showing Ex-Hack HTML documentation](TODO)
+![Screenshot showcasing the Ex-Hack HTML documentation](img/gh-screenshot.jpg)
 
 ## Abstract
 
@@ -38,9 +40,14 @@ occurrences, please do not use this tool as a way to assess your API usage yet.
 
 ## How to Contribute?
 
-Find an issue to work on, fork the repo and submit a PR.
+First, pick an issue labelled as
+[todo](https://github.com/NinjaTrappeur/ex-hack/issues?q=is%3Aissue+is%3Aopen+label%3ATodo),
+fork the project, fix the issue, add some tests and open a PR.
 
-TODO: re-write this section according to the gh issue tags.
+We use this repository as main form of communication. If you have some
+questions/need a more informal channel to get in touch with us, you can join
+the [#ex-hack](http://webchat.freenode.net?channels=%23ex-hack) channel on the
+freenode irc network.
 
 ## Architecture Overview
 
@@ -82,11 +89,11 @@ and submit a PR fixing the issue (if you can :)).
 **Note:** You don't necessarily need NixOS to use Nix, you probably can do it on your
 favorite OS.
 
-## Using Cachix as Binary Cache
+### How to Install?
+
+#### Using Cachix as Binary Cache
 
 TODO
-
-### How to Install?
 
 #### With Nix
 
