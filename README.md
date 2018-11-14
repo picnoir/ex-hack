@@ -14,8 +14,7 @@ https://exhack.org
 **Note: This is an alpha release. See the How to Contribute section to help us
 making this tool more reliable/complete.**
 
-[![Screenshot showcasing the Ex-Hack HTML documentation]
-(img/gh-screenshot.jpg)] (https://exhack.org)
+[![Screenshot showcasing the Ex-Hack HTML documentation](img/gh-screenshot.jpg)] (https://exhack.org)
 
 ## Abstract
 
