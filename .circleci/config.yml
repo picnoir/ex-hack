@@ -3,9 +3,6 @@ jobs:
   build:
     machine: true
     steps:
-      - restore_cache:
-          keys:
-            - nix-store
       - checkout
       - run:
           name: Install Nix
@@ -16,7 +13,3 @@ jobs:
           name: Run Ex-Hack test suite
           # Note: cabal-helper will get mad if we don't update our cabal pkg
           command: 'source ~/.circlerc && mkdir -p test/integration/workdir test/integration/output && nix-shell --run "cabal test unit-tests"'
-      - save_cache:
-          key: nix-store 
-          paths:
-            - /nix
