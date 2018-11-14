@@ -2,17 +2,20 @@
 
 [![CircleCI](https://circleci.com/gh/NinjaTrappeur/ex-hack.svg?style=svg)](https://circleci.com/gh/NinjaTrappeur/ex-hack)
 
-![Ex-Hack Logo](img/logo/ex-hack-full.svg)
+[![Ex-Hack Logo](img/logo/ex-hack-full.svg)](https://exhack.org)
 
 *[Ex-Hack-tement Jamy!](https://en.wikipedia.org/wiki/Jamy_Gourmaud)*
 
-Ex-Hack, shorthand for Hackage EXamples is a Haskell example-based
-documentation.
+[Ex-Hack](https://exhack.org), shorthand for Hackage EXamples is a Haskell
+example-based documentation.
+
+https://exhack.org
 
 **Note: This is an alpha release. See the How to Contribute section to help us
 making this tool more reliable/complete.**
 
-![Screenshot showcasing the Ex-Hack HTML documentation](img/gh-screenshot.jpg)
+[![Screenshot showcasing the Ex-Hack HTML documentation]
+(img/gh-screenshot.jpg)] (https://exhack.org)
 
 ## Abstract
 
