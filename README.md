@@ -89,6 +89,29 @@ and submit a PR fixing the issue (if you can :)).
 **Note:** You don't necessarily need NixOS to use Nix, you probably can do it on your
 favorite OS.
 
+### How to Generate the Doc?
+
+Once you installed ex-hack, you can download a Stackage build plan and generate
+the associated documentation with
+
+```
+ex-hack -s stackage_file.yml -n
+```
+
+By default, the files will be generated in your `XDG_DATA/ex-hack/output` directory.
+That will be `.local/share/ex-hack/output` on Linux. Once generated, you can
+either copy this static HTML documentation to the web-server you want to deploy
+it onto or spawn a small local web-server to browse it.
+
+These directory can be overridden, check out the appropriate flags using the
+`--help` argument.
+
+You may want to save the logs on top of displaying them:
+
+```
+ex-hack -s lts-12.11.yaml -n 2>&1 | tee ex-hack-run.log
+```
+
 ### How to Install?
 
 #### Using Cachix as Binary Cache
