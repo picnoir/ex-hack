@@ -36,7 +36,7 @@ occurrences, please do not use this tool as a way to assess your API usage yet.
 1. Download a Stackage build plan from [this
    repo](https://github.com/commercialhaskell/lts-haskell). **Note**: Ex-Hack
    not yet compatible with the GHC 8.6 line.
-1. Run ex-hack -s ${stackageFile} to generate the documentation. **Note**: this
+1. Run ex-hack -n -s ${stackageFile} to generate the documentation. **Note**: this
    process will download, build and index the whole Stackage packages. It will
    take quite some time.  
 
