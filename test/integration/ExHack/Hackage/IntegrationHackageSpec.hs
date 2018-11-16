@@ -118,7 +118,6 @@ testConf = Config (newDatabaseHandle $ workDir </> "test-db.sqlite")
                   (CabalFilesDir  $ fixturesDir </> "cabal")
                   (WorkDir workDir)
                   (HtmlDir htmlDir)
-                  True
 
 htmlDir :: FilePath
 htmlDir = "./test/integration/output/"

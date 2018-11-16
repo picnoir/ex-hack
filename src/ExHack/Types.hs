@@ -57,7 +57,6 @@ module ExHack.Types (
     UnifiedSym(..),
     WorkDir(..),
     cabalFilesDir,
-    createDirs,
     depsNames,
     fromComponents,
     getDatabaseHandle,
@@ -223,8 +222,7 @@ data Config a = Config {
     _tarballsDir   :: TarballsDir,
     _cabalFilesDir :: CabalFilesDir,
     _workDir       :: WorkDir,
-    _htmlDir       :: HtmlDir,
-    _createDirs    :: Bool
+    _htmlDir       :: HtmlDir
 } deriving (Eq, Show)
 
 makeLenses ''Config

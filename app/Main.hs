@@ -36,7 +36,7 @@ main = do
     hSetBuffering stdin NoBuffering
     hSetBuffering stdout NoBuffering
     c <- parseOpts
-    when (c ^. createDirs) (createConfigDirs c)
+    createConfigDirs c
     dbInit <- shouldBypassDBInit (_dbHandle c) $ runStep generateDb c
     let ci = c {_dbHandle= dbInit}  :: Config 'Initialized
     descs <- runStep parseStackage ci
@@ -136,8 +136,4 @@ parseOpts = do
                 <> value dftoutdir
                 <> metavar "OUTDIR"
                 <> help "Directory where exhack HTML documentation will be saved"))
-            <*> switch 
-                (long "create-dirs"
-                <> short 'n'
-                <> help "Create the tarball, cabal and working directories if they do not exists on the filesystem")
     execParser $ info (parser <**> helper) (failureCode 1) 

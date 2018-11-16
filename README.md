@@ -36,7 +36,7 @@ occurrences, please do not use this tool as a way to assess your API usage yet.
 1. Download a Stackage build plan from [this
    repo](https://github.com/commercialhaskell/lts-haskell). **Note**: Ex-Hack
    not yet compatible with the GHC 8.6 line.
-1. Run ex-hack -n -s ${stackageFile} to generate the documentation. **Note**: this
+1. Run ex-hack -s ${stackageFile} to generate the documentation. **Note**: this
    process will download, build and index the whole Stackage packages. It will
    take quite some time.  
 
@@ -97,7 +97,7 @@ Once you installed ex-hack, you can download a Stackage build plan and generate
 the associated documentation with
 
 ```
-ex-hack -s stackage_file.yml -n
+ex-hack -s stackage_file.yml
 ```
 
 By default, the files will be generated in your `XDG_DATA/ex-hack/output` directory.
@@ -111,7 +111,7 @@ These directory can be overridden, check out the appropriate flags using the
 You may want to save the logs on top of displaying them:
 
 ```
-ex-hack -s lts-12.11.yaml -n 2>&1 | tee ex-hack-run.log
+ex-hack -s lts-12.11.yaml 2>&1 | tee ex-hack-run.log
 ```
 
 ### How to Install?
