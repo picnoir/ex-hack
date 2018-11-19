@@ -5,10 +5,9 @@
 module Main where
 
 import           Control.Lens.Getter    ((^.))
-import           Control.Monad          (when)
 import           Options.Applicative    (execParser, failureCode, help, helper,
                                          info, long, metavar, short, strOption,
-                                         switch, value, (<**>))
+                                         value, (<**>))
 import           System.Directory       (XdgDirectory (XdgData),
                                          createDirectoryIfMissing,
                                          getXdgDirectory, listDirectory,
@@ -26,9 +25,8 @@ import           ExHack.Types           (CabalFilesDir (..), Config (..),
                                          DatabaseHandle, DatabaseStatus (..),
                                          HtmlDir (..), StackageFile (..),
                                          TarballsDir (..), WorkDir (..),
-                                         cabalFilesDir, createDirs,
-                                         getDatabaseHandle, htmlDir,
-                                         newDatabaseHandle, runStep,
+                                         cabalFilesDir, getDatabaseHandle,
+                                         htmlDir, newDatabaseHandle, runStep,
                                          tarballsDir, workDir)
 
 main :: IO ()
