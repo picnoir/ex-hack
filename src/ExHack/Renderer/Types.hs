@@ -75,7 +75,7 @@ newtype HighLightError = HighLightError String
 instance Exception HighLightError
 
 escapeUrlSegment :: Text -> Text
-escapeUrlSegment = pack . escapeURIString isReserved . unpack
+escapeUrlSegment = pack . escapeURIString (not . isReserved) . unpack
 
 -- | Render a 'Route' to a proper HTTP URL.
 renderRoute :: Render Route
