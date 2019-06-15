@@ -288,7 +288,7 @@ newtype IndexedModuleNameT = IndexedModuleNameT (ModuleNameT, Int)
 
 -- | Source code symbol.
 newtype SymName = SymName Text
-    deriving (Show, Eq, IsString, Hashable, Generic)
+    deriving (Show, Eq, Ord, IsString, Hashable, Generic)
 instance NFData SymName
 
 -- | Symbol having been indexed in the database.
