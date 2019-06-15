@@ -19,6 +19,10 @@ let
                 (super.callPackage ./nix/cabal-helper.nix {});
               selda-sqlite = pkgs.haskell.lib.doJailbreak 
                 (super.callPackage ./nix/selda-sqlite.nix {});
+              ghc-lib = pkgs.haskell.lib.doJailbreak
+                (super.callPackage ./nix/ghc-lib.nix {});
+              ghc-lib-parser = pkgs.haskell.lib.doJailbreak
+                (super.callPackage ./nix/ghc-lib-parser.nix {});
                 ex-hack = super.callPackage ./nix/ex-hack.nix {
                   stack = pkgs.stack;
                   profile = profile;

@@ -8,6 +8,8 @@ Portability : POSIX
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns     #-}
+
 module ExHack.Stackage.StackageParser (
   parseStackageYaml,
   getHackageUrls

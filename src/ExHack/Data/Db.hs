@@ -7,9 +7,14 @@ Stability   : experimental
 Portability : POSIX
 -}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE OverloadedLabels    #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 module ExHack.Data.Db (
     getHomePagePackages,
@@ -22,7 +27,8 @@ module ExHack.Data.Db (
     saveModuleUnifiedSymbols,
     savePackageDeps,
     savePackageMods,
-    savePackages
+    savePackages,
+    PackageEntity(..)
 ) where
 
 import           Control.Monad          (unless)
@@ -32,13 +38,16 @@ import qualified Data.HashSet           as HS (HashSet, fromList)
 import           Data.Maybe             (listToMaybe, maybe)
 import           Data.Text              (Text, pack)
 import qualified Data.Text              as T (lines, unlines)
-import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
-                                         aggregate, autoPrimary, count, def, fk,
-                                         fromRowId, fromSql, groupBy, innerJoin,
-                                         insertWithPK, insert_, literal, query,
-                                         required, restrict, select,
-                                         tableWithSelectors, text,
-                                         tryCreateTable, (!), (.==))
+import Database.Selda
+import qualified Database.Selda.Unsafe as UnsafeSelda
+-- import           Database.Selda         ((:*:) (..), RowID, Selector, Table,
+--                                          aggregate, autoPrimary, count, def,
+--                                          fromRowId, fromSql, groupBy, innerJoin,
+--                                          insertWithPK, insert_, literal, query,
+--                                          restrict, select,
+--                                          tableWithSelectors, text, table,
+--                                          tryCreateTable, (!), (.==), SqlRow)
+import GHC.Generics (Generic)
 import           Database.Selda.Backend (MonadSelda (..), SqlValue (SqlInt))
 import           GHC                    (SrcSpan (..), getLoc, srcSpanStartCol,
                                          srcSpanStartLine)
@@ -56,71 +65,71 @@ import           ExHack.Types           (ImportsScope, IndexedModuleNameT (..),
 import qualified ExHack.Types           as ET (ModuleExports, ModuleName,
                                                Package (..))
 
-packageId   :: Selector (RowID :*: Text) RowID
-packageName :: Selector (RowID :*: Text) Text
-packages    ::  Table (RowID :*: Text)
-(packages, packageId :*: packageName) 
-  = tableWithSelectors "packages" $
-              autoPrimary "packageId"
-              :*: required "name"
 
-dependancies :: Table (RowID :*: RowID :*: RowID)
-depPack :: Selector (RowID :*: RowID :*: RowID) RowID
-depId :: Selector (RowID :*: RowID :*: RowID) RowID
-(dependancies, _ :*: depPack :*: depId) = tableWithSelectors "dependancies" $
-                   autoPrimary "id"
-                   :*: required "packID" `fk` (packages, packageId)
-                   :*: required "depID" `fk` (packages, packageId)
+-- This could be equivalent to the commented code?
+data PackageEntity = PackageEntity
+   { packageId   :: ID PackageEntity 
+   , packageName :: Text
+   } deriving Generic
+instance SqlRow PackageEntity
+packages :: Table PackageEntity
+packages = table "packages" [#packageId :- autoPrimary]
 
-exposedModules :: Table (RowID :*: Text :*: RowID)
-modId          :: Selector (RowID :*: Text :*: RowID) RowID
-modName        :: Selector (RowID :*: Text :*: RowID) Text
-modPack        :: Selector (RowID :*: Text :*: RowID) RowID
-(exposedModules, modId :*: modName :*: modPack) = tableWithSelectors "exposedModules" $
-                   autoPrimary "id"
-                   :*: required "name"
-                   :*: required "packID" `fk` (packages, packageId)
+data DependencyEntity = DependencyEntity
+  { depInternalId :: ID DependencyEntity
+  , depPack :: ID PackageEntity 
+  , depId   :: ID PackageEntity 
+  } deriving Generic
+instance SqlRow DependencyEntity
+dependencies :: Table DependencyEntity
+dependencies = table "dependencies" [#depInternalId :- autoPrimary]
 
-exposedSymbols :: Table (RowID :*: Text :*: RowID)
-symId          :: Selector (RowID :*: Text :*: RowID) RowID
-symName        :: Selector (RowID :*: Text :*: RowID) Text
-symModId       :: Selector (RowID :*: Text :*: RowID) RowID
-(exposedSymbols, symId :*: symName :*: symModId) = tableWithSelectors "exposedSymbols" $
-                   autoPrimary "id"
-                   :*: required "name"
-                   :*: required "modId" `fk` (exposedModules, modId)
+data ExposedModuleEntity = ExposedModuleEntity
+  { modId   :: ID ExposedModuleEntity
+  , modName :: Text
+  , modPack :: ID PackageEntity 
+  } deriving Generic
+instance SqlRow ExposedModuleEntity
+exposedModules :: Table ExposedModuleEntity
+exposedModules = table "exposedModules" [#modId :- autoPrimary]
 
-sourceFiles :: Table (RowID :*: Text :*: Text :*: Text)
-fileId      :: Selector (RowID :*: Text :*: Text :*: Text) RowID
-fileContent :: Selector (RowID :*: Text :*: Text :*: Text) Text
-fileModule  :: Selector (RowID :*: Text :*: Text :*: Text) Text
-filePackage :: Selector (RowID :*: Text :*: Text :*: Text) Text
-(sourceFiles, fileId :*: fileContent :*: fileModule :*: filePackage)
-  = tableWithSelectors "sourceFiles" $
-    autoPrimary "id"
-    :*: required "fileContent"
-    :*: required "modName"
-    :*: required "packName"
+data ExposedSymbolsEntity = ExposedSymbolsEntity
+  { symId :: ID ExposedSymbolsEntity 
+  , symName :: Text
+  , symModId :: ID ExposedModuleEntity 
+  } deriving (Generic)
+instance SqlRow ExposedSymbolsEntity
+exposedSymbols :: Table ExposedSymbolsEntity
+exposedSymbols = table "exposedSymbols" [#symId :- autoPrimary]
 
-symbolOccurences :: Table    (RowID :*: Int :*: Int :*: RowID :*: RowID)
-occCol           :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) Int
-occLine          :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) Int
-occFileId        :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) RowID
-occSymId         :: Selector (RowID :*: Int :*: Int :*: RowID :*: RowID) RowID
-(symbolOccurences, _ :*: occCol :*: occLine :*: occFileId :*: occSymId) 
-  = tableWithSelectors "symbolOccurences" $
-    autoPrimary "id"
-    :*: required "column"
-    :*: required "line"
-    :*: required "sourceFileId" `fk` (sourceFiles, fileId)
-    :*: required "importedSymID" `fk` (exposedSymbols, symId)
 
+data SourceFileEntity = SourceFileEntity 
+  { fileId :: ID SourceFileEntity 
+  , fileContent :: Text 
+  , fileModule :: Text 
+  , filePackage :: Text
+  } deriving (Generic)
+instance SqlRow SourceFileEntity
+
+sourceFiles :: Table SourceFileEntity
+sourceFiles =  table "sourceFiles" [#fileId :- autoPrimary]
+
+data SymbolOccurenceEntity = SymbolOccurenceEntity
+  { internalSymId :: ID SymbolOccurenceEntity
+  , occCol :: Int
+  , occLine :: Int
+  , occFileId :: ID SourceFileEntity 
+  , occSymId :: ID ExposedSymbolsEntity 
+  } deriving (Generic)
+instance SqlRow SymbolOccurenceEntity
+symbolOccurences :: Table SymbolOccurenceEntity
+symbolOccurences = table "symbolOccurences" [#internalSymId :- autoPrimary]
 
 -- | Create the internal database schema.
 initDb :: (MonadSelda m) => m ()
 initDb = do
     tryCreateTable packages 
-    tryCreateTable dependancies 
+    tryCreateTable dependencies 
     tryCreateTable exposedModules
     tryCreateTable exposedSymbols
     tryCreateTable symbolOccurences
@@ -142,13 +151,13 @@ savePackageDeps p = do
     saveDep pid d = do
       mdid <- query $ do 
         pks <- select packages
-        restrict (pks ! packageName .== text (pack d))
-        return $ pks ! packageId
-      mapM_ (\did -> insert_ dependancies [ def :*: pid :*: did]) (listToMaybe mdid)
+        restrict (pks ! #packageName .== text (pack d))
+        return $ pks ! #packageId
+      mapM_ (\did -> insert_ dependencies [ DependencyEntity def pid did]) (listToMaybe mdid)
 
 -- | Save a package list in the DB.
 savePackages :: (MonadSelda m) => [ET.Package] -> m ()
-savePackages xs = insert_ packages $ (\p -> def :*: getName p) <$> xs 
+savePackages xs = insert_ packages $ (\p -> PackageEntity def (getName p)) <$> xs 
 
 data SaveModuleException = PackageNotInDatabase | ModuleNotInDatabase Text 
     deriving (Show)
@@ -161,7 +170,7 @@ instance Exception SaveModuleException
 --   * If the package is not in the DB, something weird happened...
 --     Throw an error
 getPackageId :: forall m. (MonadSelda m, MonadMask m)
-             => ET.Package -> m RowID
+             => ET.Package -> m (ID PackageEntity) 
 getPackageId p = maybe
     (queryPkg p >>= maybe (throwM PackageNotInDatabase) pure)
     pure
@@ -169,31 +178,31 @@ getPackageId p = maybe
 
 -- | Save the exposed modules as well as their exposed symbols.
 savePackageMods :: forall m. (MonadSelda m, MonadMask m) 
-                => ET.Package  -> [ET.ModuleExports] -> m RowID
+                => ET.Package  -> [ET.ModuleExports] -> m (ID PackageEntity) 
 savePackageMods p xs = do
     pid <- getPackageId p
     saveMod pid `mapM_` xs
     pure pid
   where
     saveMod pid (m, syms) = do
-        mid <- insertWithPK exposedModules [def :*: getModName m :*: pid]
-        insert_  exposedSymbols $ (\(SymName sn) -> def :*: sn :*: mid) <$> syms
+        mid <- insertWithPK exposedModules [ExposedModuleEntity def (getModName m) pid]
+        insert_  exposedSymbols $ (\(SymName sn) -> ExposedSymbolsEntity def sn mid) <$> syms
 
 -- | Given a module database ID, saves the exported symbols of this
 --   module in ExHack's database.
-saveModuleExports :: (MonadSelda m) => RowID -> ET.ModuleName -> [SymName] -> m ()
+saveModuleExports :: (MonadSelda m) => (ID PackageEntity) -> ET.ModuleName -> [SymName] -> m ()
 saveModuleExports pid mn xs = do
-    midi <- insertWithPK exposedModules [def :*: getModName mn :*: pid]
+    midi <- insertWithPK exposedModules [ExposedModuleEntity def  (getModName mn) pid]
     insert_ exposedSymbols $ 
-        (\(SymName s) -> def :*: s :*: midi) <$> xs
+        (\(SymName s) -> ExposedSymbolsEntity def s midi) <$> xs
 
-queryPkg :: (MonadSelda m) => ET.Package -> m (Maybe RowID)
+queryPkg :: (MonadSelda m) => ET.Package -> m (Maybe (ID PackageEntity))
 queryPkg p = do
     let r = query $ do
             pks <- select packages
-            restrict (pks ! packageName .== (text . getName) p)
-            return $ pks ! packageId 
-    listToMaybe <$> r
+            restrict (pks ! #packageName .== (text . getName) p)
+            return $ pks ! #packageId 
+    listToMaybe <$> r 
 
 -- | Query ExHack database to retrieve the available symbols to be imported
 --   from within this package.
@@ -208,33 +217,33 @@ getPkgImportScopes p = do
   where
     wrapSyms :: IndexedModuleNameT -> m (IndexedModuleNameT, HS.HashSet IndexedSym)
     wrapSyms mnt@(IndexedModuleNameT (_, i)) = do
-        let mid = fromSql $ SqlInt i :: RowID
+        let mid = fromSql $ SqlInt i :: ID ExposedModuleEntity 
         q <- query $ do
             mods <- select exposedModules 
-            restrict (mods ! modId .== literal mid)
-            syms <- innerJoin (\s -> s ! symModId .== mods ! modId) $ select exposedSymbols
-            pure $ syms ! symId :*: syms ! symName
+            restrict (mods ! #modId .== literal mid)
+            syms <- innerJoin (\s -> s ! #symModId .== mods ! #modId) $ select exposedSymbols
+            pure $ (syms ! #symId) :*: syms ! #symName
         pure (mnt, HS.fromList (wrapResult <$> q)) 
-    wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId i)
+    wrapResult (i :*: n) = IndexedSym (SymName n, fromRowId (untyped i))
 
 getScopeModules :: (MonadSelda m, MonadMask m) => ET.Package -> m [IndexedModuleNameT]
 getScopeModules p = do
     pid <- getPackageId p
     q <- query $ do
-        deps <- select dependancies
-        restrict (deps ! depPack .== literal pid)
-        mods <- innerJoin (\m -> m ! modPack .== deps ! depId) $ select exposedModules
-        return (mods ! modId :*: mods ! modName)
+        deps <- select dependencies
+        restrict (deps ! #depPack .== literal pid)
+        mods <- innerJoin (\m -> m ! #modPack .== deps ! #depId) $ select exposedModules
+        return (mods ! #modId :*: mods ! #modName)
     -- Here, we also want to look for occurences in current's package module.
     -- Not sure if it's a really good idea: we'll find occurences for sure, but we also
     -- probably consider the symbol definition as an occurence...
     qp <- query $ do
         mods <- select exposedModules
-        restrict $ (mods ! modPack .== literal pid)
-        return (mods ! modId :*: mods ! modName)
+        restrict $ (mods ! #modPack .== literal pid)
+        return (mods ! #modId :*: mods ! #modName)
     pure $ (wrapResult <$> q) <> (wrapResult <$> qp) 
   where
-    wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId i)
+    wrapResult (i :*: n) = IndexedModuleNameT (ModuleNameT n, fromRowId (untyped i))
 
 
 -- | Insert both the source file in which some symbols have been unified as well as 
@@ -242,11 +251,11 @@ getScopeModules p = do
 saveModuleUnifiedSymbols :: forall m. (MonadSelda m, MonadMask m) => [UnifiedSym] -> SourceCodeFile -> m ()
 saveModuleUnifiedSymbols xs (SourceCodeFile f (ModuleNameT mnt) (PackageNameT pnt)) = 
     unless (null xs) $ do
-        fid <- insertWithPK sourceFiles [def :*:  f :*: mnt :*: pnt]
+        (fid :: ID SourceFileEntity) <- insertWithPK sourceFiles [SourceFileEntity def f mnt pnt]
         insert_ symbolOccurences $ generateLine fid <$> xs
   where
       generateLine fid (UnifiedSym (IndexedSym (_, sidi), LocatedSym (_, _, gloc))) = 
-          def :*: col :*: line :*: fid :*: sid 
+          SymbolOccurenceEntity def col line fid sid 
         where
           (RealSrcSpan loc) = getLoc gloc
           !line = srcSpanStartLine loc
@@ -258,44 +267,44 @@ getHomePagePackages :: forall m. (MonadSelda m, MonadMask m) => m [HomePagePacka
 getHomePagePackages = do 
     res <- query $ aggregate $ do
         pkgs <- select packages
-        mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
-        pid <- groupBy (pkgs ! packageId) 
-        pn <- groupBy (pkgs ! packageName)
-        pure $ pid :*: pn :*: count (mods ! modId)   
+        mods <- innerJoin (\m -> pkgs ! #packageId .== m ! #modPack) $ select exposedModules
+        pid <- groupBy (pkgs ! #packageId) 
+        pn <- groupBy (pkgs ! #packageName)
+        pure $ pid :*: pn :*: count (mods ! #modId)   
     pure $ wrapResult <$> res 
   where
-    wrapResult (i :*: n :*: c) = HomePagePackage (PackageName (i,n)) c
+    wrapResult (i :*: n :*: c) = HomePagePackage (PackageName (untyped i,n)) c
 
 -- | Retrieve the data necessary to render the HTML package page.
 getPackagePageMods :: forall m. (MonadSelda m, MonadMask m) => PackageName -> m [ModuleName]
 getPackagePageMods (PackageName (pid, _)) = do
     res <- query $ do
         pkgs <- select packages
-        restrict $ pkgs ! packageId .== literal pid 
-        mods <- innerJoin (\m -> pkgs ! packageId .== m ! modPack) $ select exposedModules
-        pure $ mods ! modId :*: mods ! modName
+        restrict $ pkgs ! #packageId .== UnsafeSelda.cast (literal pid)
+        mods <- innerJoin (\m -> pkgs ! #packageId .== m ! #modPack) $ select exposedModules
+        pure $ mods ! #modId :*: mods ! #modName
     pure $ wrapResult <$> res
   where
-    wrapResult (i :*: n) = ModuleName (i,n)
+    wrapResult (i :*: n) = ModuleName (untyped i,n)
 
 -- | Retrieve the data necessary to render the HTML module page.
 getModulePageSyms :: forall m. (MonadSelda m, MonadMask m) => PackageName -> ModuleName -> m [SymbolOccurs]
 getModulePageSyms _ (ModuleName (mid,_)) = do
     sids <- query $ do
         syms <- select exposedSymbols
-        restrict $ syms ! symModId .== literal mid
-        pure $ syms ! symId :*: syms ! symName
+        restrict $ syms ! #symModId .== UnsafeSelda.cast (literal mid)
+        pure $ syms ! #symId :*: syms ! #symName
     mapM (\(sid :*: sn) -> wrapResult sn <$> querySym sid) sids
   where
-    querySym :: RowID -> m [Int :*: Int :*: Text :*: Text :*: Text]
+    querySym :: ID ExposedSymbolsEntity -> m [Int :*: Int :*: Text :*: Text :*: Text]
     querySym sid = query $ do
         syms <- select exposedSymbols
-        restrict $ syms ! symId .== literal sid 
-        occs  <- innerJoin (\o -> o ! occSymId .== syms ! symId) $ select symbolOccurences
-        files <- innerJoin (\f -> f ! fileId .== occs ! occFileId) $ select sourceFiles
-        pure $ (occs ! occCol) :*: (occs ! occLine) :*: 
-               (files ! fileContent) :*: (files ! fileModule) :*:
-               (files ! filePackage)
+        restrict $ syms ! #symId .== literal sid 
+        occs  <- innerJoin (\o -> o ! #occSymId .== syms ! #symId) $ select symbolOccurences
+        files <- innerJoin (\f -> f ! #fileId .== occs ! #occFileId) $ select sourceFiles
+        pure $ (occs ! #occCol) :*: (occs ! #occLine) :*: 
+               (files ! #fileContent) :*: (files ! #fileModule) :*:
+               (files ! #filePackage)
     wrapResult :: SymbolName -> [Int :*: Int :*: Text :*: Text :*: Text] -> SymbolOccurs
     wrapResult sname occs = SymbolOccurs sname (wrapOcc occs)
     wrapOcc = fmap 

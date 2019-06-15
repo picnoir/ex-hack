@@ -20,6 +20,7 @@ Portability : POSIX
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
+{-# LANGUAGE BangPatterns               #-}
 
 module ExHack.Types (
     AlterDatabase,

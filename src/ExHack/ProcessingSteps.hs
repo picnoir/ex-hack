@@ -47,7 +47,7 @@ import qualified Data.Text                      as T (pack, replace, unpack)
 import qualified Data.Text.IO                   as T (readFile)
 import qualified Data.Text.Lazy                 as TL (Text)
 import qualified Data.Text.Lazy.IO              as TL (hPutStr)
-import           Database.Selda                 (RowID, SeldaM)
+import           Database.Selda                 (SeldaM, ID)
 import           Database.Selda.SQLite          (withSQLite)
 import           Network.HTTP.Client            (Manager, httpLbs,
                                                  managerSetProxy, newManager,
@@ -68,7 +68,8 @@ import           ExHack.Data.Db                 (getHomePagePackages,
                                                  getPkgImportScopes, initDb,
                                                  saveModuleExports,
                                                  saveModuleUnifiedSymbols,
-                                                 savePackageDeps, savePackages)
+                                                 savePackageDeps, savePackages,
+                                                 PackageEntity)
 import           ExHack.Ghc                     (getModImports, getModSymbols,
                                                  unLoc)
 import           ExHack.Hackage.Hackage         (findComponentRoot,
@@ -295,7 +296,7 @@ retrievePkgsExports pkgs = do
         processMod pid pfp croots `mapM_` mns
         pure $ nb + 1
       where
-        processMod :: RowID -> PackageFilePath -> [ComponentRoot] -> ModuleName -> m ()
+        processMod :: ID PackageEntity -> PackageFilePath -> [ComponentRoot] -> ModuleName -> m ()
         processMod pid pfp crs mn = do
             (_, me) <- getModExports pfp crs mn
             -- Breaks a bit the design but necessary to keep
