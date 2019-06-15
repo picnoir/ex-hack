@@ -25,7 +25,9 @@ spec = describe "ghc" $ do
         (hf, _) <- readHieFile nc "./test/unit/fixtures/simple.hie"
         let symbols = collectSymbols somePackage hf
             symbolNames = nub $ sort $ map getSymName symbols
-        symbolNames `shouldBe` []
+        -- This is a little hacky and should probably be replaced
+        show symbolNames `shouldBe` "[SymName \"GHC.Base.$\",SymName \"GHC.Base.return\",SymName \"GHC.Float.pi\",SymName \"GHC.Num.*\",SymName \"GHC.Tuple.()\",SymName \"GHC.Types.Double\",SymName \"GHC.Types.IO\",SymName \"Main.areaOfCircle\",SymName \"Main.main\",SymName \"Main.myPi\",SymName \"System.Environment.lookupEnv\",SymName \"System.IO.print\"]"
+
         where
             somePackage = Package
              (error "get a better package identifier")
