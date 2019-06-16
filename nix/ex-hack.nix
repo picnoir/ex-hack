@@ -1,5 +1,5 @@
 { mkDerivation, ansi-terminal, base, blaze-html, bytestring, Cabal
-, cabal-helper, containers, deepseq, directory, exceptions
+, containers, deepseq, directory, exceptions
 , file-embed, filepath, ghc, ghc-paths, hashable, hspec
 , http-client, http-client-tls, lens, mtl, network-uri
 , optparse-applicative, process, pygments, safe, selda, selda-sqlite
@@ -14,7 +14,7 @@ mkDerivation rec {
   isExecutable = true;
   doCheck = false;
   libraryHaskellDepends = [
-    ansi-terminal base blaze-html bytestring Cabal cabal-helper
+    ansi-terminal base blaze-html bytestring Cabal
     containers deepseq directory exceptions file-embed filepath ghc
     ghc-paths hashable http-client http-client-tls lens mtl network-uri
     process safe selda selda-sqlite shakespeare tar text
