@@ -34,7 +34,7 @@ library
       exceptions           >= 0.10,
       file-embed           >= 0.0.10,
       filepath             >= 1.4.2,
-      ghc                  >= 8.4.3,
+--      ghc                  >= 8.4.3,
       ghc-paths            >= 0.1,
       hashable             >= 1.2,
       http-client          >= 0.5,
@@ -51,7 +51,8 @@ library
       text                 >= 1.2,
       unordered-containers >= 0.2,
       yaml                 >= 0.8.32,
-      zlib                 >= 0.6
+      zlib                 >= 0.6,
+      ghc-lib              >= 8.8.0
   exposed-modules:
       ExHack.Cabal.CabalParser,
       ExHack.Data.Db,
@@ -96,11 +97,14 @@ test-suite unit-tests
       ex-hack,
       file-embed >= 0.0.10,
       hspec,
-      text
+      text,
+      ghc-lib              >= 8.8.0,
+      ghc-paths            >= 0.1
   other-modules:
       ExHack.CabalSpec,
       ExHack.ModulePathSpec,
-      ExHack.StackageSpec
+      ExHack.StackageSpec,
+      ExHack.GhcSpec
   default-language: Haskell2010
 
 test-suite integration-tests

@@ -42,6 +42,8 @@
     - git: https://git.alternativebit.fr/NinjaTrappeur/cabal-helper.git 
       commit: 0709c4fd0e25fc885c6650dbd54d632f074f6d01
     - cabal-plan-0.4.0.0
+    - ghc-lib-8.8.0.20190424@sha256:1201a85259afde3939d21c6c582af6cce00be211de2370e26d5c4f30c4671add
+    - ghc-lib-parser-8.8.0.20190424@sha256:4562d8e869a5aab1d2b43c5d73063e768f78f51f99d98ef9b0150ca359f9ec98
 
     # Override default flag values for local packages and extra-deps
     # flags: {}
