@@ -1,6 +1,6 @@
-{ compiler  ? "ghc843"
-, rev       ? "f9002b83fd1998a6cc6fb8d66b8c9752b42c7fcd"
-, sha256    ? "19cb7rf2yv933k5p6mc60i2wqwy7i1ralrb49gvma65f1kipk0rv"
+{ compiler  ? "ghc865"
+, rev       ? "8c14a6f641b7f3baa57e55e784a0d8626325446b"
+, sha256    ? "0jbkkjqpjjr63agh7p8pbnlyq2kknl9a1wbrxhaf8033j9f9fni7"
 , profile   ? false
 }:
 
@@ -19,6 +19,10 @@ let
                 (super.callPackage ./nix/cabal-helper.nix {});
               selda-sqlite = pkgs.haskell.lib.doJailbreak 
                 (super.callPackage ./nix/selda-sqlite.nix {});
+              # ghc-lib = pkgs.haskell.lib.doJailbreak
+                # (super.callPackage ./nix/ghc-lib.nix {});
+              # ghc-lib-parser = pkgs.haskell.lib.doJailbreak
+              #  (super.callPackage ./nix/ghc-lib-parser.nix {});
                 ex-hack = super.callPackage ./nix/ex-hack.nix {
                   stack = pkgs.stack;
                   profile = profile;

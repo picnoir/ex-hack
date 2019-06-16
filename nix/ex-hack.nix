@@ -1,10 +1,10 @@
 { mkDerivation, ansi-terminal, base, blaze-html, bytestring, Cabal
-, cabal-helper, containers, deepseq, directory, exceptions
+, containers, deepseq, directory, exceptions
 , file-embed, filepath, ghc, ghc-paths, hashable, hspec
 , http-client, http-client-tls, lens, mtl, network-uri
 , optparse-applicative, process, pygments, safe, selda, selda-sqlite
 , shakespeare, stdenv, tar, text, unordered-containers, yaml, zlib, stack
-, profile
+, profile, ghc-lib, ghc-lib-parser
 }:
 mkDerivation rec {
   pname = "ex-hack";
@@ -14,11 +14,11 @@ mkDerivation rec {
   isExecutable = true;
   doCheck = false;
   libraryHaskellDepends = [
-    ansi-terminal base blaze-html bytestring Cabal cabal-helper
+    ansi-terminal base blaze-html bytestring Cabal
     containers deepseq directory exceptions file-embed filepath ghc
     ghc-paths hashable http-client http-client-tls lens mtl network-uri
     process safe selda selda-sqlite shakespeare tar text
-    unordered-containers yaml zlib
+    unordered-containers yaml zlib ghc-lib ghc-lib-parser
   ];
 
   # Dirty hack: cabal-helper seems to dislike nix-build and makes the whole
@@ -28,10 +28,10 @@ mkDerivation rec {
   buildDepends = testHaskellDepends;
   enableLibraryProfiling = profile;
   executableHaskellDepends = [
-    base directory filepath lens optparse-applicative text
+    base directory filepath lens optparse-applicative text ghc-lib-parser
   ];
   testHaskellDepends = [
-    base containers directory file-embed filepath hspec text stack
+    base containers directory file-embed filepath hspec text stack ghc-lib-parser
   ];
   homepage = "https://github.com/TORELEASE";
   license = stdenv.lib.licenses.gpl3;

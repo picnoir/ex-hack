@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns        #-}
+
 module ExHack.Hackage.Hackage (
     findComponentRoot,
     getModExports,

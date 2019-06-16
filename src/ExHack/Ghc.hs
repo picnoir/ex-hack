@@ -26,9 +26,9 @@ import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Maybe              (fromMaybe, isNothing)
 import           Data.Text               (pack)
 import qualified Data.Text               as T (pack, unpack)
-import qualified Distribution.Helper     as H (ChComponentName (ChLibName),
-                                               components, ghcOptions,
-                                               mkQueryEnv, runQuery)
+-- import qualified Distribution.Helper     as H (ChComponentName (ChLibName),
+--                                                components, ghcOptions,
+--                                                mkQueryEnv, runQuery)
 import           Distribution.ModuleName (ModuleName, toFilePath)
 import           FastString              (unpackFS)
 import           GHC                     (DesugaredModule, GenLocated (..), Ghc,
@@ -98,22 +98,23 @@ getModSymbols p pfp cr@(ComponentRoot crt) mn =
             fileName = crt </> toFilePath mn <.> "hs"
 
 getCabalDynFlagsLib :: forall m. (MonadIO m) => FilePath -> m (Maybe [String])
-getCabalDynFlagsLib fp = do
-    mdir <- getDistDir
-    let dist = fromMaybe "dist" mdir
-    let qe = H.mkQueryEnv fp (fp </> dist)
-    cs <- H.runQuery qe $ H.components $ (,) <$> H.ghcOptions
-    pure $ fst <$> headMay (filter getLib cs)
-  where
-    getDistDir :: m (Maybe FilePath)
-    getDistDir = do
-        platformDir <- liftIO $ listDirectory $ ".stack-work" </> "dist"
-        let mpd = ((".stack-work" </> "dist") </>) <$> headMay platformDir
-        cabalInstallDir <- liftIO $ mapM listDirectory mpd 
-        let mid = headMay =<< cabalInstallDir
-        pure $ liftM2 (</>) mpd mid
-    getLib (_,H.ChLibName) = True
-    getLib _ = False
+getCabalDynFlagsLib _ = return Nothing -- TODO: Hack, let's see where this breaks
+-- getCabalDynFlagsLib fp = do
+--     mdir <- getDistDir
+--     let dist = fromMaybe "dist" mdir
+--     let qe = H.mkQueryEnv fp (fp </> dist)
+--     cs <- H.runQuery qe $ H.components $ (,) <$> H.ghcOptions
+--     pure $ fst <$> headMay (filter getLib cs)
+--   where
+--     getDistDir :: m (Maybe FilePath)
+--     getDistDir = do
+--         platformDir <- liftIO $ listDirectory $ ".stack-work" </> "dist"
+--         let mpd = ((".stack-work" </> "dist") </>) <$> headMay platformDir
+--         cabalInstallDir <- liftIO $ mapM listDirectory mpd 
+--         let mid = headMay =<< cabalInstallDir
+--         pure $ liftM2 (</>) mpd mid
+--     getLib (_,H.ChLibName) = True
+--     getLib _ = False
 
 -- | Retrieves a `DesugaredModule` exported symbols.
 getModExports :: DesugaredModule -> [SymName]
